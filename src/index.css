@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-alabaster: #FAF9F6;
+  --color-brand-charcoal: #2D2926;
+  --color-brand-greige: #F2EFE9;
+  --color-brand-border: #E5E0D8;
+  --color-brand-olive: #5A5A40;
+  --color-brand-brown: #A6705D;
+  --color-brand-sage: #8C8375;
+  --font-serif: "Georgia", Georgia, serif;
+}
+
+body {
+  background-color: var(--color-brand-alabaster);
+  color: var(--color-brand-charcoal);
+}

@@ -1,0 +1,1211 @@
+import React, { useState, useEffect } from "react";
+import { WardrobeItem, OutfitSuggestion } from "./types";
+import { initialCuratedWardrobe, exportToCSVString } from "./data";
+import WardrobeCard from "./components/WardrobeCard";
+import OutfitBuilder from "./components/OutfitBuilder";
+import AnalyticsPanel from "./components/AnalyticsPanel";
+import ExcelImporter from "./components/ExcelImporter";
+import {
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Plus,
+  Download,
+  BookOpen,
+  PieChart,
+  Grid,
+  FileSpreadsheet,
+  X,
+  TrendingUp,
+  Tag,
+  AlertCircle,
+  RefreshCw,
+  Edit2,
+  Trash2,
+  ListRestart
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+
+export default function App() {
+  const [wardrobe, setWardrobe] = useState<WardrobeItem[]>([]);
+  const [savedOutfits, setSavedOutfits] = useState<OutfitSuggestion[]>([]);
+  const [activeTab, setActiveTab] = useState<"closet" | "planner" | "insights" | "dataset">("closet");
+  
+  // Selection and search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // all, existing, buy
+  const [brandFilter, setBrandFilter] = useState("all");
+  const [colorFilter, setColorFilter] = useState("all");
+  const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
+
+  // Forms / Modals
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [newItem, setNewItem] = useState({
+    item: "",
+    color: "",
+    description: "",
+    brand: "",
+    notes: "",
+    status: "existing" as "existing" | "buy",
+    aiSuggestedCategory: "Tops"
+  });
+  const [aiAutofillQuery, setAiAutofillQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [isDetailEditing, setIsDetailEditing] = useState(false);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const cachedWardrobe = localStorage.getItem("capsule_closet_wardrobe");
+    const cachedOutfits = localStorage.getItem("capsule_closet_outfits");
+    
+    if (cachedWardrobe) {
+      try {
+        setWardrobe(JSON.parse(cachedWardrobe));
+      } catch (e) {
+        setWardrobe(initialCuratedWardrobe);
+      }
+    } else {
+      // Seed with initial gorgeous data
+      setWardrobe(initialCuratedWardrobe);
+    }
+
+    if (cachedOutfits) {
+      try {
+        setSavedOutfits(JSON.parse(cachedOutfits));
+      } catch (e) {
+        setSavedOutfits([]);
+      }
+    }
+  }, []);
+
+  // Sync to localStorage
+  useEffect(() => {
+    if (wardrobe.length > 0) {
+      localStorage.setItem("capsule_closet_wardrobe", JSON.stringify(wardrobe));
+    }
+  }, [wardrobe]);
+
+  useEffect(() => {
+    localStorage.setItem("capsule_closet_outfits", JSON.stringify(savedOutfits));
+  }, [savedOutfits]);
+
+  // Dynamic lookup of representative images when viewing or selecting a closet garment
+  useEffect(() => {
+    if (selectedItem && !selectedItem.imageUrl) {
+      handleFetchItemImage(selectedItem);
+    }
+  }, [selectedItem?.id]);
+
+  // Export to local download file
+  const handleDownloadBackup = () => {
+    const csvContent = exportToCSVString(wardrobe);
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "capsule_wardrobes_updated.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportNewItems = (newItems: WardrobeItem[]) => {
+    setWardrobe(prev => [...prev, ...newItems]);
+    setActiveTab("closet");
+  };
+
+  const handleClearCloset = () => {
+    if (window.confirm("Are you sure you want to completely clear the wardrobe? This will reset all local changes.")) {
+      setWardrobe([]);
+      localStorage.removeItem("capsule_closet_wardrobe");
+    }
+  };
+
+  const handleDeleteItem = (id: string) => {
+    setWardrobe(prev => prev.filter(i => i.id !== id));
+    if (selectedItem?.id === id) {
+      setSelectedItem(null);
+    }
+  };
+
+  const handleToggleStatus = (id: string) => {
+    setWardrobe(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          status: item.status === "existing" ? "buy" : "existing"
+        };
+      }
+      return item;
+    }));
+    // Sync active selection details
+    if (selectedItem?.id === id) {
+      setSelectedItem(prev => prev ? { ...prev, status: prev.status === "existing" ? "buy" : "existing" } : null);
+    }
+  };
+
+  // Trigger Gemini item analysis to enrich color codes & styling recommendations
+  const handleAnalyzeItem = async (targetItem: WardrobeItem) => {
+    setAiLoading(true);
+    try {
+      const response = await fetch("/api/gemini/analyze-item", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(targetItem)
+      });
+      if (response.ok) {
+        const enriched = await response.json();
+        const updatedList = wardrobe.map(item => {
+          if (item.id === targetItem.id) {
+            const updated = {
+              ...item,
+              hex: enriched.hex || item.hex,
+              aiSuggestedCategory: enriched.aiSuggestedCategory || item.aiSuggestedCategory,
+              aiStyleTags: enriched.aiStyleTags || ["Aesthetic Class"],
+              aiStylingAdvice: enriched.aiStylingAdvice || "Classic wear coordinates."
+            };
+            setSelectedItem(updated);
+            return updated;
+          }
+          return item;
+        });
+        setWardrobe(updatedList);
+      }
+    } catch (e) {
+      console.error("AI Analysis failed:", e);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Dynamically look up a representative styling photo from the online search engine
+  const handleFetchItemImage = async (targetItem: WardrobeItem) => {
+    setImageLoading(true);
+    try {
+      const response = await fetch("/api/image-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item: targetItem.item,
+          color: targetItem.color,
+          brand: targetItem.brand
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const imageUrl = data.imageUrl || "";
+        const updatedList = wardrobe.map(item => {
+          if (item.id === targetItem.id) {
+            return { ...item, imageUrl };
+          }
+          return item;
+        });
+        setWardrobe(updatedList);
+        setSelectedItem(prev => prev && prev.id === targetItem.id ? { ...prev, imageUrl } : prev);
+      }
+    } catch (err) {
+      console.error("Error fetching online image lookup:", err);
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  // Category specific curated stock image placeholder library
+  const getCategoryPlaceholder = (category: string): string => {
+    const norm = (category || "Tops").toLowerCase();
+    if (norm.includes("top") || norm.includes("shirt") || norm.includes("sweater")) {
+      return "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&h=450&q=80";
+    }
+    if (norm.includes("bottom") || norm.includes("pants") || norm.includes("jean") || norm.includes("trousers")) {
+      return "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=400&h=450&q=80";
+    }
+    if (norm.includes("outerwear") || norm.includes("coat") || norm.includes("jacket") || norm.includes("blazer")) {
+      return "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=400&h=450&q=80";
+    }
+    if (norm.includes("dress") || norm.includes("skirt")) {
+      return "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=400&h=450&q=80";
+    }
+    if (norm.includes("shoe") || norm.includes("boots") || norm.includes("sneaker")) {
+      return "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=400&h=450&q=80";
+    }
+    if (norm.includes("accessories") || norm.includes("bag") || norm.includes("watch")) {
+      return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&h=450&q=80";
+    }
+    return "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=400&h=450&q=80";
+  };
+
+  // Add individual clothes item manually with validation, feedback & search lookup
+  const handleAddIndividualItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(null);
+
+    // Form validation
+    const trimmedItem = newItem.item.trim();
+    const trimmedColor = newItem.color.trim();
+    const trimmedDescription = newItem.description.trim();
+    const trimmedBrand = newItem.brand.trim() || "Classic";
+    const trimmedNotes = newItem.notes.trim();
+
+    if (!trimmedItem) {
+      setFormError("The Clothing Item Name is required. Please provide a garment category name.");
+      return;
+    }
+    if (!trimmedColor) {
+      setFormError("The Color Name is required (e.g., 'Camel', 'Navy Blue', 'Olive').");
+      return;
+    }
+
+    setAiLoading(true);
+
+    const added: WardrobeItem = {
+      id: `manual-${Date.now()}`,
+      item: trimmedItem,
+      color: trimmedColor,
+      description: trimmedDescription,
+      brand: trimmedBrand,
+      notes: trimmedNotes,
+      status: newItem.status,
+      aiSuggestedCategory: newItem.aiSuggestedCategory,
+      hex: guessHexColor(trimmedColor),
+      aiStyleTags: ["Bespoke"],
+      aiStylingAdvice: "Tap 'Enrich item Advice' to generate styling reviews!"
+    };
+
+    try {
+      // Discover a representative styling image during saving
+      const imageRes = await fetch("/api/image-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item: added.item,
+          color: added.color,
+          brand: added.brand
+        })
+      });
+      if (imageRes.ok) {
+        const imgData = await imageRes.json();
+        if (imgData.imageUrl) {
+          added.imageUrl = imgData.imageUrl;
+        }
+      }
+    } catch (err) {
+      console.error("Error auto-fetching added garment visual:", err);
+    }
+
+    setWardrobe(prev => [added, ...prev]);
+    setFormSuccess(`Direct addition of '${added.brand} ${added.item}' successful! Found representative visual look.`);
+    
+    // Smooth timing reset & close
+    setTimeout(() => {
+      setShowAddForm(false);
+      setNewItem({
+        item: "",
+        color: "",
+        description: "",
+        brand: "",
+        notes: "",
+        status: "existing",
+        aiSuggestedCategory: "Tops"
+      });
+      setFormSuccess(null);
+    }, 2200);
+
+    setAiLoading(false);
+    setAiAutofillQuery("");
+  };
+
+  // Standard fast color resolver for adding new clothes
+  const guessHexColor = (colorStr: string): string => {
+    const raw = (colorStr || "grey").toLowerCase().trim();
+    if (raw.includes("navy")) return "#1e3a8a";
+    if (raw.includes("blue")) return "#60a5fa";
+    if (raw.includes("camel")) return "#c19a6b";
+    if (raw.includes("beige") || raw.includes("oatmeal")) return "#eae6df";
+    if (raw.includes("cream") || raw.includes("sand")) return "#f5f5dc";
+    if (raw.includes("white") || raw.includes("ivory")) return "#fafaf9";
+    if (raw.includes("black")) return "#1c1917";
+    if (raw.includes("grey") || raw.includes("gray")) return "#78716c";
+    if (raw.includes("charcoal")) return "#3f3f46";
+    if (raw.includes("olive")) return "#3d5236";
+    if (raw.includes("sage")) return "#9caf88";
+    if (raw.includes("green")) return "#22c55e";
+    if (raw.includes("cherry") || raw.includes("burgundy") || raw.includes("wine")) return "#58181a";
+    if (raw.includes("red")) return "#ef4444";
+    if (raw.includes("brown") || raw.includes("cognac") || raw.includes("tan")) return "#854d0e";
+    if (raw.includes("pink")) return "#f472b6";
+    if (raw.includes("yellow")) return "#fbbf24";
+    return "#cbd5e1";
+  };
+
+  // AI Autofill fields via prompt search
+  const handleAiSearchAutofill = async () => {
+    if (!aiAutofillQuery.trim()) return;
+    setAiLoading(true);
+    try {
+      const response = await fetch("/api/explore-ideas", { // wait, let's use search route
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: aiAutofillQuery })
+      });
+      // Try resolving directly under Gemini suggestions
+      const searchRes = await fetch("/api/gemini/explore-ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: aiAutofillQuery })
+      });
+
+      if (searchRes.ok) {
+        const results = await searchRes.json();
+        if (results && results.length > 0) {
+          const mainIdea = results[0];
+          setNewItem({
+            item: mainIdea.item,
+            color: mainIdea.color,
+            description: mainIdea.description,
+            brand: mainIdea.brand,
+            notes: mainIdea.notes,
+            status: "buy", // wishlist since she's exploring ideas to buy
+            aiSuggestedCategory: mainIdea.aiSuggestedCategory || "Tops"
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Save changes done to specific wardrobe cards
+  const handleSaveEditedDetails = (updated: WardrobeItem) => {
+    setWardrobe(prev => prev.map(item => item.id === updated.id ? updated : item));
+    setSelectedItem(updated);
+    setIsDetailEditing(false);
+  };
+
+  // Filter calculations
+  const uniqueBrands = Array.from(new Set(wardrobe.map(w => w.brand || "Unbranded"))).filter(Boolean);
+  const uniqueColors = Array.from(new Set(wardrobe.map(w => w.color))).filter(Boolean);
+
+  const filteredItems = wardrobe.filter(item => {
+    const normSearchQuery = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !normSearchQuery ||
+      item.item.toLowerCase().includes(normSearchQuery) ||
+      item.color.toLowerCase().includes(normSearchQuery) ||
+      (item.brand || "").toLowerCase().includes(normSearchQuery) ||
+      (item.description || "").toLowerCase().includes(normSearchQuery) ||
+      (item.notes || "").toLowerCase().includes(normSearchQuery) ||
+      (item.aiSuggestedCategory || "").toLowerCase().includes(normSearchQuery) ||
+      (item.aiStyleTags || []).some(t => t.toLowerCase().includes(normSearchQuery)) ||
+      (item.aiStylingAdvice || "").toLowerCase().includes(normSearchQuery);
+
+    const matchesCategory =
+      categoryFilter === "all" ||
+      (item.aiSuggestedCategory || "Tops").toLowerCase() === categoryFilter.toLowerCase();
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      item.status === statusFilter;
+
+    const matchesBrand =
+      brandFilter === "all" ||
+      item.brand === brandFilter;
+
+    const matchesColor =
+      colorFilter === "all" ||
+      item.color.toLowerCase() === colorFilter.toLowerCase();
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesBrand && matchesColor;
+  });
+
+  return (
+    <div className="min-h-screen bg-brand-alabaster text-brand-charcoal font-sans flex flex-col antialiased">
+      {/* Editorial Header Banner */}
+      <header className="border-b border-brand-border bg-brand-greige/60 sticky top-0 z-30 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-full border border-brand-olive/30 bg-brand-olive text-white flex items-center justify-center font-bold tracking-tighter text-sm font-serif italic shadow-sm">
+              C.
+            </span>
+            <div>
+              <h1 className="font-serif italic font-semibold text-brand-olive text-2xl tracking-tight leading-none">
+                Capsule.
+              </h1>
+              <p className="text-brand-sage text-[11px] font-sans mt-0.5 font-bold uppercase tracking-widest">
+                Wardrobe Manager v1.0
+              </p>
+            </div>
+          </div>
+
+          {/* Quick interactive header widgets */}
+          <div className="flex items-center gap-3">
+            {wardrobe.length > 0 && (
+              <button
+                onClick={handleDownloadBackup}
+                className="hidden sm:flex items-center gap-1.5 px-6 py-3 bg-brand-olive text-white font-bold text-[10px] tracking-widest uppercase rounded-[32px] transition-all hover:bg-[#484833] cursor-pointer"
+                title="Saves and updates your .xlsx / .csv backup sheet instantly"
+              >
+                <Download className="w-3.5 h-3.5" /> Save to Spreadsheet
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-1.5 px-6 py-3 bg-brand-olive text-white hover:bg-[#484833] font-semibold text-xs tracking-tight rounded-[32px] transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Add Clothes Item
+            </button>
+          </div>
+        </div>
+
+        {/* Global tab layouts */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-8 -mb-px">
+          {[
+            { id: "closet", label: "My Digital Closet", icon: Grid },
+            { id: "planner", label: "Capsule Lookbook", icon: BookOpen },
+            { id: "insights", label: "Color Story & Vibe", icon: PieChart },
+            { id: "dataset", label: "Spreadsheet Hub", icon: FileSpreadsheet }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`py-3 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all shrink-0 cursor-pointer ${
+                  isActive
+                    ? "border-brand-olive text-brand-olive font-bold"
+                    : "border-transparent text-brand-sage hover:text-brand-charcoal hover:border-brand-border"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* Main Container Stage */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <AnimatePresence mode="wait">
+          {activeTab === "closet" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {/* Dynamic Filter Controls Bar in Greige box */}
+              <div className="bg-brand-greige/45 border border-brand-border p-5 rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-4">
+                <div className="flex flex-col md:flex-row gap-3">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-brand-sage/80 absolute left-4 top-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Search brand, color, or item (pants, trench coat, COS blazer)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-white border border-brand-border text-brand-charcoal text-xs pl-11 pr-4 py-3 rounded-[32px] focus:ring-1 focus:ring-brand-olive focus:outline-none transition-all placeholder-brand-sage/80"
+                    />
+                  </div>
+
+                  {/* Fast Filtering options Category */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative h-full">
+                      <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[125px] focus:ring-1 focus:ring-brand-olive"
+                      >
+                        <option value="all">All Apparel</option>
+                        <option value="tops">Tops</option>
+                        <option value="bottoms">Bottoms</option>
+                        <option value="outerwear">Outerwear</option>
+                        <option value="dresses">Dresses</option>
+                        <option value="shoes">Shoes</option>
+                        <option value="accessories">Accessories</option>
+                      </select>
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-brand-sage/80 pointer-events-none absolute right-3.5 top-3.5" />
+                    </div>
+
+                    {/* Status filtering */}
+                    <div className="relative h-full">
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                      >
+                        <option value="all">All Stats</option>
+                        <option value="existing">In Closet</option>
+                        <option value="buy">Wishlist</option>
+                      </select>
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-brand-sage/80 pointer-events-none absolute right-3.5 top-3.5" />
+                    </div>
+
+                    {/* Brands */}
+                    {uniqueBrands.length > 0 && (
+                      <div className="relative h-full">
+                        <select
+                          value={brandFilter}
+                          onChange={(e) => setBrandFilter(e.target.value)}
+                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                        >
+                          <option value="all">All Brands</option>
+                          {uniqueBrands.map(br => (
+                            <option key={br} value={br}>{br}</option>
+                          ))}
+                        </select>
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-brand-sage/80 pointer-events-none absolute right-3.5 top-3.5" />
+                      </div>
+                    )}
+
+                    {/* Color Filter */}
+                    {uniqueColors.length > 0 && (
+                      <div className="relative h-full">
+                        <select
+                          value={colorFilter}
+                          onChange={(e) => setColorFilter(e.target.value)}
+                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                        >
+                          <option value="all">All Colors</option>
+                          {uniqueColors.map(col => (
+                            <option key={col} value={col}>{col}</option>
+                          ))}
+                        </select>
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-brand-sage/80 pointer-events-none absolute right-3.5 top-3.5" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid garments List */}
+              {filteredItems.length === 0 ? (
+                <div className="border border-stone-200 border-dashed rounded-2xl p-16 text-center bg-white">
+                  <Grid className="w-10 h-10 text-stone-300 mx-auto mb-4" />
+                  <p className="text-stone-700 text-sm font-semibold">No clothes match your selection criteria</p>
+                  <p className="text-stone-400 text-xs mt-1">Try resetting filter tags, typing other queries, or importing your spreadsheet.</p>
+                  
+                  <div className="mt-5 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setCategoryFilter("all");
+                        setStatusFilter("all");
+                        setBrandFilter("all");
+                      }}
+                      className="px-4 py-2 bg-stone-900 text-stone-50 text-xs tracking-wider uppercase font-semibold rounded-lg hover:bg-stone-800"
+                    >
+                      Reset Filters
+                    </button>
+                    {wardrobe.length === 0 && (
+                      <button
+                        onClick={() => setActiveTab("dataset")}
+                        className="px-4 py-2 border border-stone-200 text-stone-700 text-xs tracking-wider uppercase font-semibold rounded-lg hover:bg-stone-100"
+                      >
+                        Import Spreadsheet
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  <AnimatePresence>
+                    {filteredItems.map(item => (
+                      <WardrobeCard
+                        key={item.id}
+                        item={item}
+                        onSelect={setSelectedItem}
+                        onDelete={handleDeleteItem}
+                        onToggleStatus={handleToggleStatus}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "planner" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <OutfitBuilder
+                wardrobe={wardrobe}
+                savedOutfits={savedOutfits}
+                onSaveOutfit={(o) => setSavedOutfits(prev => [o, ...prev])}
+                onDeleteOutfit={(idx) => setSavedOutfits(prev => prev.filter((_, i) => i !== idx))}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === "insights" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <AnalyticsPanel wardrobe={wardrobe} />
+            </motion.div>
+          )}
+
+          {activeTab === "dataset" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <ExcelImporter
+                onImportComplete={handleImportNewItems}
+                onClearWardrobe={handleClearCloset}
+                itemsCount={wardrobe.length}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* CURATED ITEM DETAILS DRAWER MODAL (AI Analysis & Custom editing portal) */}
+      <AnimatePresence>
+        {selectedItem && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs z-50 flex items-center justify-end"
+            id="item-details-drawer-overlay"
+            onClick={() => setSelectedItem(null)}
+          >
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-white h-full w-full max-w-lg shadow-2xl p-6 flex flex-col justify-between overflow-y-auto space-y-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-start justify-between border-b border-stone-100 pb-4">
+                <div>
+                  <span className="text-[10px] font-bold font-mono text-stone-400 uppercase tracking-widest block">
+                    Garment Profile Review
+                  </span>
+                  <h3 className="font-sans font-semibold text-stone-950 text-base flex items-center gap-2 mt-1">
+                    {selectedItem.item}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedItem(null)}
+                  className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-850"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Main Body view or edit mode toggle */}
+              <div className="flex-1 space-y-6 flex flex-col justify-between">
+                {!isDetailEditing ? (
+                  <>
+                    {/* Image section next to or above color details */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                      {/* Left: Discovered image or category placeholder */}
+                      <div className="relative aspect-square sm:aspect-auto sm:h-44 rounded-xl border border-brand-border overflow-hidden bg-brand-greige/20 flex items-center justify-center">
+                        {imageLoading ? (
+                          <div className="flex flex-col items-center justify-center gap-2 text-brand-sage">
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                            <span className="text-[10px] font-medium font-sans uppercase tracking-wider">Finding Look...</span>
+                          </div>
+                        ) : selectedItem.imageUrl ? (
+                          <img
+                            src={selectedItem.imageUrl}
+                            alt={selectedItem.item}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          // Default category-specific placeholder image fallback
+                          <div className="w-full h-full relative flex flex-col items-center justify-center">
+                            <img
+                              src={getCategoryPlaceholder(selectedItem.aiSuggestedCategory || "Tops")}
+                              alt="Placeholder"
+                              className="w-full h-full object-cover opacity-60 mix-blend-multiply"
+                            />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 p-3 text-center">
+                              <span className="text-[10px] font-bold text-brand-olive uppercase tracking-widest leading-none">Default View</span>
+                              <p className="text-[9px] text-[#555] mt-1 leading-normal">Discovered styling fallback</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Dynamic "Re-trigger image lookup" icon button */}
+                        <button
+                          onClick={() => handleFetchItemImage(selectedItem)}
+                          title="Search photo online"
+                          className="absolute bottom-2 right-2 p-1.5 bg-white/95 border border-brand-border text-brand-sage hover:text-brand-charcoal hover:bg-white rounded-lg shadow-xs z-10 transition-all cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Right: Brand and color notes */}
+                      <div className="flex flex-col justify-between gap-3">
+                        <div className="bg-stone-50 border border-stone-100 p-3 rounded-xl flex-1 flex flex-col justify-center">
+                          <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Manufacturer</span>
+                          <p className="font-semibold text-stone-850 text-xs capitalize mt-0.5">{selectedItem.brand || "Classic"}</p>
+                          
+                          <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider mt-2 block">Ownership Status</span>
+                          <p className="font-semibold text-stone-850 text-xs capitalize mt-0.5">
+                            {selectedItem.status === "existing" ? "Closet Item (Owned)" : "Wishlist (To Buy)"}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-100">
+                          <div
+                            className="w-8 h-8 rounded-lg border border-stone-250 shadow-2xs shrink-0"
+                            style={{ backgroundColor: selectedItem.hex }}
+                          />
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Color Tone</span>
+                            <p className="font-semibold text-stone-850 text-xs capitalize leading-none mt-0.5 truncate max-w-[120px]">{selectedItem.color}</p>
+                            <p className="font-mono text-[9px] text-stone-400 mt-0.5">{selectedItem.hex}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Label */}
+                    <div className="space-y-1">
+                      <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider block">Standardized Category</span>
+                      <p className="bg-stone-100/80 text-stone-800 text-xs px-3 py-1.5 rounded-lg border border-stone-200/80 inline-block capitalize font-medium">
+                        {selectedItem.aiSuggestedCategory || "Tops"}
+                      </p>
+                    </div>
+
+                    {/* Description Paragraph */}
+                    <div className="space-y-1">
+                      <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider block">Textile Description</span>
+                      <p className="text-stone-700 text-xs leading-relaxed italic">
+                        "{selectedItem.description || "No description provided."}"
+                      </p>
+                    </div>
+
+                    {/* Personal Notes */}
+                    <div className="space-y-1">
+                      <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider block">Personal Style & Fit Notes</span>
+                      <p className="text-stone-600 text-xs leading-relaxed bg-amber-50/50 p-3 rounded-lg border border-amber-100/50">
+                        {selectedItem.notes || "No detailed sizing or material fit feedback yet."}
+                      </p>
+                    </div>
+
+                    {/* Curated Gemini AI Styling Insight block */}
+                    <div className="border border-stone-200/80 rounded-xl p-4.5 bg-stone-50/40 relative space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] uppercase font-bold text-stone-400 tracking-widest font-mono flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-stone-500 animate-pulse" /> Gemini Look Director Advice
+                        </span>
+
+                        <button
+                          onClick={() => handleAnalyzeItem(selectedItem)}
+                          disabled={aiLoading}
+                          className="px-2.5 py-1 text-[9px] font-bold text-stone-900 bg-white border border-stone-350 hover:bg-stone-55 disabled:bg-stone-150 uppercase tracking-wider rounded-md flex items-center gap-1 transition-colors shadow-2xs"
+                        >
+                          {aiLoading ? (
+                            <>
+                              <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                              Enrich item Advice
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2.5 pt-1">
+                        <p className="text-stone-750 text-xs leading-relaxed">
+                          {selectedItem.aiStylingAdvice || "No design review compiled yet. Tap 'Enrich item Advice' to generate styling notes and precise hexadecimal coordinates!"}
+                        </p>
+
+                        {selectedItem.aiStyleTags && selectedItem.aiStyleTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {selectedItem.aiStyleTags.map((tg, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[8.5px] uppercase font-semibold bg-stone-900 text-stone-50 px-2 py-0.5 rounded-md flex items-center gap-0.5"
+                              >
+                                <Tag className="w-2 h-2" />
+                                {tg}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // Inline editor form
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Clothes Item Name</label>
+                      <input
+                        type="text"
+                        value={selectedItem.item}
+                        onChange={(e) => setSelectedItem({ ...selectedItem, item: e.target.value })}
+                        className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Manufacturer / Brand</label>
+                        <input
+                          type="text"
+                          value={selectedItem.brand}
+                          onChange={(e) => setSelectedItem({ ...selectedItem, brand: e.target.value })}
+                          className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Garment Category</label>
+                        <select
+                          value={selectedItem.aiSuggestedCategory || "Tops"}
+                          onChange={(e) => setSelectedItem({ ...selectedItem, aiSuggestedCategory: e.target.value })}
+                          className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3 py-2 rounded-lg focus:outline-none"
+                        >
+                          <option value="Tops">Tops</option>
+                          <option value="Bottoms">Bottoms</option>
+                          <option value="Outerwear">Outerwear</option>
+                          <option value="Dresses">Dresses</option>
+                          <option value="Shoes">Shoes</option>
+                          <option value="Accessories">Accessories</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Color name</label>
+                        <input
+                          type="text"
+                          value={selectedItem.color}
+                          onChange={(e) => setSelectedItem({ ...selectedItem, color: e.target.value, hex: guessHexColor(e.target.value) })}
+                          className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Hex color swatch</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={selectedItem.hex}
+                            onChange={(e) => setSelectedItem({ ...selectedItem, hex: e.target.value })}
+                            className="w-10 h-8 border border-stone-200 cursor-pointer p-0 rounded-lg shrink-0"
+                          />
+                          <input
+                            type="text"
+                            value={selectedItem.hex}
+                            onChange={(e) => setSelectedItem({ ...selectedItem, hex: e.target.value })}
+                            className="bg-white border border-stone-200 text-stone-800 text-xs px-2.5 py-2 rounded-lg flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Textile Description</label>
+                      <input
+                        type="text"
+                        value={selectedItem.description}
+                        onChange={(e) => setSelectedItem({ ...selectedItem, description: e.target.value })}
+                        className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Personal Notes & Fit</label>
+                      <textarea
+                        value={selectedItem.notes}
+                        onChange={(e) => setSelectedItem({ ...selectedItem, notes: e.target.value })}
+                        rows={3}
+                        className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-stone-700">Existing Closet status:</label>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedItem({ ...selectedItem, status: selectedItem.status === "existing" ? "buy" : "existing" })}
+                        className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${
+                          selectedItem.status === "existing"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                            : "bg-amber-50 text-amber-800 border-amber-100"
+                        }`}
+                      >
+                        {selectedItem.status === "existing" ? "In Closet" : "Wishlist (Buy)"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Drawer footer actions */}
+              <div className="flex items-center gap-2 border-t border-stone-100 pt-4">
+                {!isDetailEditing ? (
+                  <>
+                    <button
+                      onClick={() => setIsDetailEditing(true)}
+                      className="flex-1 py-2.5 bg-stone-900 text-stone-50 font-bold text-xs uppercase tracking-wider rounded-xl transition-all hover:bg-stone-800"
+                    >
+                      Edit Clothes Card
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDeleteItem(selectedItem.id);
+                        setSelectedItem(null);
+                      }}
+                      className="px-4 py-2.5 border border-red-200 text-red-650 hover:bg-red-50 text-xs font-semibold rounded-xl"
+                    >
+                      Delete
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleSaveEditedDetails(selectedItem)}
+                      className="flex-1 py-2.5 bg-emerald-650 hover:bg-emerald-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-all bg-stone-900 text-stone-50"
+                    >
+                      Save changes
+                    </button>
+                    <button
+                      onClick={() => setIsDetailEditing(false)}
+                      className="px-4 py-2.5 border border-stone-200 text-stone-700 hover:bg-stone-50 text-xs font-semibold rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* QUICK ADD GARMENT DIALOG DRAWER */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAddForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl p-6 overflow-y-auto max-h-[85vh] space-y-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between border-b border-stone-100 pb-3">
+                <div>
+                  <h3 className="font-sans font-semibold text-stone-950 text-base">
+                    Introduce Clothes Piece
+                  </h3>
+                  <p className="text-stone-400 text-[11px] mt-0.5">
+                    Log manually or autofill styled apparel matching specific wish vibes using Gemini.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="p-1 hover:bg-stone-100 rounded-lg text-stone-400 hover:text-stone-850"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Gemini smart search autofill box */}
+              <div className="bg-stone-50 border border-stone-100 p-4 rounded-xl space-y-3">
+                <span className="text-[9px] uppercase font-bold text-stone-400 tracking-widest font-mono flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-stone-500" /> AI Style Ideas Autofiller
+                </span>
+                
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={aiAutofillQuery}
+                    onChange={(e) => setAiAutofillQuery(e.target.value)}
+                    placeholder="e.g. Camel trench burberry or cos linen white pants"
+                    className="flex-grow bg-white border border-stone-200 text-stone-800 text-xs px-3 py-2 rounded-lg focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAiSearchAutofill}
+                    disabled={aiLoading || !aiAutofillQuery.trim()}
+                    className="px-3.5 py-2 bg-stone-900 hover:bg-stone-800 disabled:bg-stone-200 text-stone-50 text-[10px] font-bold tracking-wider uppercase rounded-lg shrink-0 flex items-center gap-1"
+                  >
+                    {aiLoading ? <RefreshCw className="w-3 h-3 animate-spin"/> : "Autofill"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Manual input form */}
+              {formError && (
+                <div className="bg-[#FAF9F6] border-l-4 border-[#8A5229] p-3 rounded-r-xl text-[#8A5229] text-xs font-mono flex items-center gap-2 shadow-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-[#8A5229]" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {formSuccess && (
+                <div className="bg-[#E8F0E8] border-l-4 border-[#4A674A] p-3 rounded-r-xl text-[#4A674A] text-xs font-sans font-semibold flex items-center gap-2.5 shadow-xs">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4A674A] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#4A674A]"></span>
+                  </span>
+                  <span>{formSuccess}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAddIndividualItem} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Garment Item Name*</label>
+                  <input
+                    type="text"
+                    value={newItem.item}
+                    onChange={(e) => setNewItem({ ...newItem, item: e.target.value })}
+                    required
+                    placeholder="e.g. Cashmere Sweater, Silk Blouse, Wool Trousers"
+                    className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Manufacturer / Brand</label>
+                    <input
+                      type="text"
+                      value={newItem.brand}
+                      onChange={(e) => setNewItem({ ...newItem, brand: e.target.value })}
+                      placeholder="e.g. COS, Burberry, Everlane"
+                      className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Apparel Category</label>
+                    <select
+                      value={newItem.aiSuggestedCategory}
+                      onChange={(e) => setNewItem({ ...newItem, aiSuggestedCategory: e.target.value })}
+                      className="w-full bg-white border border-stone-200 text-stone-850 text-xs px-3 py-2 rounded-lg focus:outline-none"
+                    >
+                      <option value="Tops">Tops</option>
+                      <option value="Bottoms">Bottoms</option>
+                      <option value="Outerwear">Outerwear</option>
+                      <option value="Dresses">Dresses</option>
+                      <option value="Shoes">Shoes</option>
+                      <option value="Accessories">Accessories</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Color Name*</label>
+                    <input
+                      type="text"
+                      value={newItem.color}
+                      onChange={(e) => setNewItem({ ...newItem, color: e.target.value })}
+                      required
+                      placeholder="e.g. Navy Blue, Beige, Olive Green"
+                      className="w-full bg-white border border-stone-200 text-stone-850 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Ownership Status</label>
+                    <div className="grid grid-cols-2 gap-1 bg-stone-100 p-0.5 rounded-lg border border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, status: "existing" })}
+                        className={`text-[10px] font-bold py-1.5 rounded-md uppercase tracking-wider transition-all ${
+                          newItem.status === "existing" ? "bg-white text-stone-850 shadow-2xs" : "text-stone-400"
+                        }`}
+                      >
+                        In Closet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, status: "buy" })}
+                        className={`text-[10px] font-bold py-1.5 rounded-md uppercase tracking-wider transition-all ${
+                          newItem.status === "buy" ? "bg-white text-stone-855 shadow-2xs" : "text-stone-400"
+                        }`}
+                      >
+                        Buy Wishlist
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Textile Description</label>
+                  <input
+                    type="text"
+                    value={newItem.description}
+                    onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                    placeholder="e.g. Lightweight fine weave knit, ribbed hem."
+                    className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Personal fit / wear notes</label>
+                  <textarea
+                    value={newItem.notes}
+                    onChange={(e) => setNewItem({ ...newItem, notes: e.target.value })}
+                    placeholder="Sizing recommendations, favorite styling hooks, fits true..."
+                    rows={2}
+                    className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-stone-900 border border-stone-900 text-stone-50 hover:bg-stone-800 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all"
+                  >
+                    Add to Studio Closet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-4 py-3 border border-stone-250 text-stone-700 hover:bg-stone-50 text-xs font-semibold rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Elegant Styled Footer */}
+      <footer className="border-t border-stone-200 bg-white py-10 mt-12 text-center text-xs text-stone-400 space-y-1 font-mono">
+        <p>© {new Date().getFullYear()} Capsule Wardrobe Studio • Designed for local custom closets.</p>
+        <p>Connected with server-side Gemini 3.5 AI look directors.</p>
+      </footer>
+    </div>
+  );
+}
