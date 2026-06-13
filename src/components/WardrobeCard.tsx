@@ -157,7 +157,7 @@ export default function WardrobeCard({ item, onSelect, onDelete, onToggleStatus 
         )}
 
         {/* Hover overlay trigger cue */}
-        <div className="absolute inset-0 bg-stone-900/5 opacity-0 group-hover:opacity-100 rounded-t-[20px] flex items-center justify-center transition-all duration-300">
+        <div className="absolute inset-0 bg-stone-900/10 opacity-0 group-hover:opacity-100 rounded-t-[20px] flex items-center justify-center transition-all duration-300 z-10">
           <span className="bg-white/95 text-brand-charcoal text-[11px] px-3 py-1.5 rounded-full font-semibold shadow-sm flex items-center gap-1 border border-brand-border">
             <Eye className="w-3.5 h-3.5" /> View Details
           </span>
