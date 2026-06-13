@@ -129,7 +129,7 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
       </div>
 
       {/* Target Season and Column Layout Selector */}
-      <div className="bg-brand-olive/5 border border-brand-olive/15 rounded-[20px] p-5 text-brand-charcoal space-y-3.5 shadow-2xs">
+      <div className="bg-brand-olive/5 border border-brand-olive/15 rounded-sm p-5 text-brand-charcoal space-y-3.5 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-brand-olive font-sans">
@@ -143,14 +143,14 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
             <select
               value={targetSeason}
               onChange={(e) => setTargetSeason(e.target.value)}
-              className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-2.5 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[210px] focus:ring-1 focus:ring-brand-olive font-medium shadow-3xs"
+              className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-2.5 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[210px] focus:ring-1 focus:ring-brand-olive font-medium shadow-3xs"
             >
-              <option value="auto">✨ Auto-Detect Season Tab</option>
-              <option value="Summer 25-26">☀️ Summer capsule 2025 - 26</option>
-              <option value="Autumn 26">🍁 Autumn 26</option>
-              <option value="Winter 26">❄️ Winter capsule 2026</option>
-              <option value="Handbag Inventory">💼 Handbag Inventory</option>
-              <option value="Dream AW">⭐️ Dream capsule AW (Future)</option>
+              <option value="auto/">Auto-Detect Season Tab</option>
+              <option value="Summer 25-26/">Summer capsule 2025 - 26</option>
+              <option value="Autumn 26/">Autumn 26</option>
+              <option value="Winter 26/">Winter capsule 2026</option>
+              <option value="Handbag Inventory/">Handbag Inventory</option>
+              <option value="Dream AW/">Dream capsule AW (Future)</option>
             </select>
             <FolderUp className="w-3.5 h-3.5 text-brand-sage absolute right-3 top-3 pointer-events-none" />
           </div>
@@ -169,7 +169,7 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
       </div>
 
       {/* Visual Import Guides & Answers to User Queries */}
-      <div className="bg-amber-50/20 border border-amber-600/10 rounded-[20px] p-5 text-brand-charcoal space-y-3.5 shadow-3xs">
+      <div className="bg-amber-50/20 border border-amber-600/10 rounded-sm p-5 text-brand-charcoal space-y-3.5 shadow-3xs">
         <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800 font-sans flex items-center gap-1.5">
           <Info className="w-4 h-4 text-amber-700 font-sans" /> Professional Import Guidelines
         </h4>
@@ -206,7 +206,7 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
             onDragLeave={handleDrag}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`cursor-pointer border-2 border-dashed rounded-[20px] p-8 text-center flex flex-col items-center justify-center space-y-4 transition-all h-60 relative ${
+            className={`cursor-pointer border-2 border-dashed rounded-sm p-8 text-center flex flex-col items-center justify-center space-y-4 transition-all h-60 relative ${
               dragActive
                 ? "border-brand-charcoal bg-brand-greige"
                 : "border-brand-border bg-[#FAF9F6]/50 hover:bg-brand-greige/20"
@@ -250,7 +250,7 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
             <button
               onClick={() => handleProcessText(pasteData)}
               disabled={!pasteData.trim()}
-              className="w-full py-3 bg-brand-olive hover:bg-[#484833] disabled:bg-brand-sage/40 text-white font-semibold text-xs uppercase tracking-widest rounded-[32px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+              className="w-full py-3 bg-brand-olive hover:bg-[#484833] disabled:bg-brand-sage/40 text-white font-semibold text-xs uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
             >
               <ClipboardCopy className="w-4 h-4" /> Load Copied Cells
             </button>
@@ -272,7 +272,7 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
       )}
 
       {/* Quick starter toolkit */}
-      <footer className="bg-brand-greige/35 rounded-[20px] p-5 border border-brand-border flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="bg-brand-greige/35 rounded-sm p-5 border border-brand-border flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="p-2.5 bg-white rounded-lg border border-brand-border text-brand-sage shrink-0">
             <Info className="w-4 h-4" />
@@ -290,14 +290,14 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={handleLoadTemplate}
-            className="px-5 py-2.5 bg-brand-olive hover:bg-[#484833] text-white font-semibold text-[10px] tracking-widest uppercase rounded-[32px] transition-all flex items-center gap-1 cursor-pointer"
+            className="px-5 py-2.5 bg-brand-olive hover:bg-[#484833] text-white font-semibold text-[10px] tracking-widest uppercase rounded-sm transition-all flex items-center gap-1 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" /> Load preset edit
           </button>
           {itemsCount > 0 && (
             <button
               onClick={onClearWardrobe}
-              className="px-5 py-2.5 bg-white text-[#8C3F3F] hover:bg-[#FDF6F6] border border-[#E6CCCC] font-semibold text-[10px] tracking-widest uppercase rounded-[32px] transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-white text-[#8C3F3F] hover:bg-[#FDF6F6] border border-[#E6CCCC] font-semibold text-[10px] tracking-widest uppercase rounded-sm transition-all cursor-pointer"
             >
               Clear Closet
             </button>

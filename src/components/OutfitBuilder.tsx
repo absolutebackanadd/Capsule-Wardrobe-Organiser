@@ -191,7 +191,7 @@ export default function OutfitBuilder({
       });
 
       if (res.ok) {
-        setMemorySavedMessage(`Successfully logged feedback into the memories ledger file! Gemini has adjusted its rules.`);
+        setMemorySavedMessage(`Successfully logged feedback into the memories ledger file! the system has adjusted its rules.`);
         setFeedbackText("");
         setReportingOutfitIdx(null);
         fetchMemoriesLedger();
@@ -221,7 +221,7 @@ export default function OutfitBuilder({
     }
   };
 
-  // Trigger server-side Gemini 3.5 AI styling planner
+  // Trigger server-side the System 3.5 AI styling planner
   const generateAiOutfits = async (customPrompt?: string) => {
     if (filteredWardrobe.length === 0) {
       setError(`Your filtered wardrobe has 0 items. Add or switch your active capsule to one containing pieces so the AI Capsule Director can pair them!`);
@@ -243,11 +243,11 @@ export default function OutfitBuilder({
         body: JSON.stringify({ items: sanitizedItems, objective: finalObjective }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to generate outfit capsules");
-      }
-
       const rawData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(rawData.details || rawData.error || "Failed to generate outfit capsules");
+      }
       
       // Map return IDs back to real wardrobe item references
       const parsedOutfits: OutfitSuggestion[] = rawData.map((out: any) => {
@@ -268,7 +268,7 @@ export default function OutfitBuilder({
       setAiOutfits(parsedOutfits);
     } catch (err: any) {
       console.error(err);
-      setError("Could not coordinate styling with Gemini Capsule Director. Make sure your API key is correctly configured.");
+      setError(`System Engine Execution Failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -340,7 +340,7 @@ export default function OutfitBuilder({
     if (name.includes("church") || name.includes("sunday")) return "⛪";
     if (name.includes("dinner") || name.includes("drink")) return "🍸";
     if (name.includes("wildcard")) return "🎲";
-    return "✨";
+    return "";
   };
 
   return (
@@ -351,26 +351,26 @@ export default function OutfitBuilder({
             Style Capsule Planner & Director
           </h2>
           <p className="text-brand-sage text-sm mt-1">
-            Generate Gemini-styled outfit lookbooks based on daily activities, learn from suitability corrections, or draft looks manually.
+            Generate the engine-styled outfit lookbooks based on daily activities, learn from suitability corrections, or draft looks manually.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
           {/* Capsule Dropdown Picker */}
-          <div className="flex items-center gap-2.5 bg-brand-greige/30 border border-brand-border/60 px-4 py-2 rounded-[32px]">
+          <div className="flex items-center gap-2.5 bg-brand-greige/30 border border-brand-border/60 px-4 py-2 rounded-sm">
             <span className="text-[10px] uppercase font-bold text-brand-sage tracking-wider font-sans whitespace-nowrap">Selected Capsule:</span>
             <div className="relative">
               <select
                 value={selectedCapsule}
                 onChange={(e) => handleLocalCapsuleChange(e.target.value)}
-                className="appearance-none bg-white border border-brand-border text-brand-charcoal font-semibold text-xs py-1.5 pl-3 pr-8 rounded-[24px] focus:outline-none focus:ring-1 focus:ring-brand-olive cursor-pointer"
+                className="appearance-none bg-white border border-brand-border text-brand-charcoal font-semibold text-xs py-1.5 pl-3 pr-8 rounded-sm focus:outline-none focus:ring-1 focus:ring-brand-olive cursor-pointer"
               >
-                <option value="all_actual">✨ All Actual Pieces</option>
-                <option value="Summer 25-26">☀️ Summer 25-26</option>
-                <option value="Autumn 26">🍁 Autumn 26</option>
-                <option value="Winter 26">❄️ Winter 26</option>
-                <option value="Handbag Inventory">💼 Handbag Inventory</option>
-                <option value="Dream AW">⭐️ Dream AW Future</option>
+                <option value="all_actual/">All Actual Pieces</option>
+                <option value="Summer 25-26/">Summer 25-26</option>
+                <option value="Autumn 26/">Autumn 26</option>
+                <option value="Winter 26/">Winter 26</option>
+                <option value="Handbag Inventory/">Handbag Inventory</option>
+                <option value="Dream AW/">Dream AW Future</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-brand-sage">
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -383,7 +383,7 @@ export default function OutfitBuilder({
               setManualMode(!manualMode);
               setAiOutfits([]);
             }}
-            className={`px-5 py-2.5 text-xs font-semibold rounded-[32px] tracking-wider uppercase border transition-all cursor-pointer ${
+            className={`px-5 py-2.5 text-xs font-semibold rounded-sm tracking-wider uppercase border transition-all cursor-pointer ${
               manualMode
                 ? "bg-brand-charcoal text-white border-brand-charcoal"
                 : "bg-white text-brand-charcoal border-brand-border hover:bg-brand-greige/50"
@@ -396,7 +396,7 @@ export default function OutfitBuilder({
 
       {/* AI DIRECTIONAL CONSOLE */}
       {!manualMode && (
-        <section className="bg-brand-greige/40 rounded-[24px] border border-brand-border p-6 space-y-6">
+        <section className="bg-brand-greige/40 rounded-sm border border-brand-border p-6 space-y-6">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-brand-olive text-white rounded-xl shadow-3xs">
               <Sparkles className="w-5 h-5 animate-pulse" />
@@ -406,7 +406,7 @@ export default function OutfitBuilder({
                 Activity Outfit Matcher
               </h3>
               <p className="text-xs text-brand-sage leading-relaxed">
-                Choose an activity capsule. Gemini will intuit appropriate garment suitability, layering notes, and color aesthetics. 
+                Choose an activity capsule. the engine will intuit appropriate garment suitability, layering notes, and color aesthetics. 
               </p>
             </div>
           </div>
@@ -476,14 +476,14 @@ export default function OutfitBuilder({
 
           <div className="space-y-2">
             <span className="text-[10px] uppercase font-bold text-brand-sage tracking-wider block">
-              Aesthetic Direction / Gemini Prompts (Editable)
+              Aesthetic Direction / the engine Prompts (Editable)
             </span>
             <input
               type="text"
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
               placeholder="Aesthetic moods or styling goals"
-              className="w-full bg-white border border-brand-border text-brand-charcoal text-sm px-4.5 py-3 rounded-[32px] focus:ring-1 focus:ring-brand-olive focus:outline-none placeholder-brand-sage"
+              className="w-full bg-white border border-brand-border text-brand-charcoal text-sm px-4.5 py-3 rounded-sm focus:ring-1 focus:ring-brand-olive focus:outline-none placeholder-brand-sage"
             />
           </div>
 
@@ -491,7 +491,7 @@ export default function OutfitBuilder({
             <button
               onClick={() => generateAiOutfits()}
               disabled={loading}
-              className="w-full sm:flex-1 py-3 bg-brand-olive hover:bg-[#484833] disabled:bg-brand-sage/40 text-white font-bold text-xs uppercase tracking-widest rounded-[32px] flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+              className="w-full sm:flex-1 py-3 bg-brand-olive hover:bg-[#484833] disabled:bg-brand-sage/40 text-white font-bold text-xs uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
             >
               <Sparkles className="w-4 h-4 animate-pulse" />
               Generate Styled look for {selectedActivity.split(" (")[0]}
@@ -501,7 +501,7 @@ export default function OutfitBuilder({
               onClick={triggerWildcardSuggestion}
               disabled={loading}
               title="Style unexpected pattern pairs, bold color contrasts & experimental matches!"
-              className="w-full sm:w-auto px-6 py-3 bg-stone-900 border border-stone-850 hover:bg-stone-800 text-stone-100 font-bold text-xs uppercase tracking-widest rounded-[32px] flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer group"
+              className="w-full sm:w-auto px-6 py-3 bg-stone-900 border border-stone-850 hover:bg-stone-800 text-stone-100 font-bold text-xs uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer group"
             >
               <Shuffle className="w-4 h-4 group-hover:rotate-12 transition-transform" />
               🎲 Surprise Wildcard
@@ -543,7 +543,7 @@ export default function OutfitBuilder({
               </div>
 
               <div className="text-center space-y-1.5 z-10 px-5 max-w-md">
-                <h4 className="font-serif font-semibold text-brand-charcoal text-base">Gemini Style Director orchestrating look permutations...</h4>
+                <h4 className="font-serif font-semibold text-brand-charcoal text-base">Analytical Engine orchestrating look permutations...</h4>
                 <p className="text-brand-sage text-xs font-mono tracking-wide uppercase">{loaderPhrase}</p>
                 <p className="text-[10px] text-brand-sage/60">Cross-referencing active capsule items with logged corrections ledger</p>
               </div>
@@ -574,7 +574,7 @@ export default function OutfitBuilder({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ type: "spring", stiffness: 380, damping: 26, delay: index * 0.05 }}
                         key={index}
-                        className="bg-white rounded-[24px] border border-brand-border p-6 shadow-xs flex flex-col lg:flex-row justify-between gap-6 hover:shadow-md transition-all duration-200 relative overflow-visible"
+                        className="bg-white rounded-sm border border-brand-border p-6 shadow-xs flex flex-col lg:flex-row justify-between gap-6 hover:shadow-md transition-all duration-200 relative overflow-visible"
                       >
                         {/* Tiny Card Index Number Display */}
                         <div className="absolute top-0 left-0 bg-brand-olive text-white px-3 py-1 text-[10px] font-mono font-bold rounded-br-2xl select-none shadow-3xs">
@@ -612,7 +612,7 @@ export default function OutfitBuilder({
                                 onSaveOutfit(outfit);
                                 setAiOutfits(prev => prev.filter((_, idx) => idx !== index));
                               }}
-                              className="px-5 py-2.5 bg-[#E8F0E8] text-[#4A674A] hover:bg-[#dbebd8] text-[10.5px] font-bold tracking-widest uppercase rounded-[32px] flex items-center gap-1.5 transition-all cursor-pointer"
+                              className="px-5 py-2.5 bg-[#E8F0E8] text-[#4A674A] hover:bg-[#dbebd8] text-[10.5px] font-bold tracking-widest uppercase rounded-sm flex items-center gap-1.5 transition-all cursor-pointer"
                             >
                               <Heart className="w-3.5 h-3.5 fill-[#4A674A] text-[#4A674A]" />
                               Pin LOOK to Portfolio
@@ -623,7 +623,7 @@ export default function OutfitBuilder({
                                 setReportingOutfitIdx(isReportingThis ? null : index);
                                 setFeedbackText("");
                               }}
-                              className="px-4 py-2.5 bg-red-50 text-red-750 hover:bg-red-100/70 border border-red-200/50 text-[10.5px] font-bold tracking-widest uppercase rounded-[32px] flex items-center gap-1 transition-all cursor-pointer"
+                              className="px-4 py-2.5 bg-red-50 text-red-750 hover:bg-red-100/70 border border-red-200/50 text-[10.5px] font-bold tracking-widest uppercase rounded-sm flex items-center gap-1 transition-all cursor-pointer"
                             >
                               <AlertCircle className="w-3.5 h-3.5" />
                               {isReportingThis ? "Close Correction" : "Log Styling Mistake"}
@@ -640,8 +640,8 @@ export default function OutfitBuilder({
                                 className="bg-red-50/50 rounded-xl p-4 border border-red-200/40 space-y-3 overflow-hidden text-xs"
                               >
                                 <div className="space-y-1">
-                                  <label className="font-bold text-red-950 uppercase text-[9px] tracking-wider block">What did Gemini get wrong about this outfit suitability?</label>
-                                  <p className="text-[11px] text-red-900/80 leading-tight">Specify why certain items don't work, color mismatches, or layout suitability faults. This is written onto memories.md, educating Gemini instantly.</p>
+                                  <label className="font-bold text-red-950 uppercase text-[9px] tracking-wider block">What did the engine get wrong about this outfit suitability?</label>
+                                  <p className="text-[11px] text-red-900/80 leading-tight">Specify why certain items don't work, color mismatches, or layout suitability faults. This is written onto memories.md, educating the engine instantly.</p>
                                 </div>
                                 <textarea
                                   value={feedbackText}
@@ -744,7 +744,7 @@ export default function OutfitBuilder({
       )}
 
       {/* REPOSITORY ALIGNMENT MEMORIES LEDGER */}
-      <section className="bg-white rounded-[24px] border border-brand-border p-5 space-y-3 shadow-3xs hover:shadow-xs transition-shadow">
+      <section className="bg-white rounded-sm border border-brand-border p-5 space-y-3 shadow-3xs hover:shadow-xs transition-shadow">
         <button
           onClick={() => setShowLedger(!showLedger)}
           className="w-full flex items-center justify-between font-serif text-brand-charcoal text-sm font-semibold tracking-wide uppercase outline-none select-none cursor-pointer"
@@ -765,11 +765,11 @@ export default function OutfitBuilder({
               className="space-y-3 overflow-hidden"
             >
               <p className="text-xs text-brand-sage leading-relaxed">
-                This database board reads directly from the project's locally written <code className="bg-[#FAF9F6] border border-stone-200 px-1 py-0.5 rounded-md font-semibold select-all text-[11px]">memories.md</code> file in your repository. Every correction you log reinforces the rules, telling Gemini what combination to avoid.
+                This database board reads directly from the project's locally written <code className="bg-[#FAF9F6] border border-stone-200 px-1 py-0.5 rounded-md font-semibold select-all text-[11px]">memories.md</code> file in your repository. Every correction you log reinforces the rules, telling the engine what combination to avoid.
               </p>
 
               <div className="bg-[#FAF9F6] border border-brand-border rounded-xl p-4 max-h-60 overflow-y-auto font-mono text-[11px] leading-relaxed select-text text-brand-charcoal whitespace-pre-wrap divide-y divide-brand-border/30">
-                {savedMemories ? savedMemories : "No specific corrections logged yet in memories.md! If Gemini fails on item suitability, hit 'Log Styling Mistake' on suggestion cards above."}
+                {savedMemories ? savedMemories : "No specific corrections logged yet in memories.md! If the engine fails on item suitability, hit 'Log Styling Mistake' on suggestion cards above."}
               </div>
 
               {savedMemories && (
@@ -789,7 +789,7 @@ export default function OutfitBuilder({
 
       {/* MANUAL COMPOSER CONSOLE */}
       {manualMode && (
-        <section className="bg-brand-greige/40 rounded-[20px] border border-brand-border p-6 space-y-6 animate-fade-in">
+        <section className="bg-brand-greige/40 rounded-sm border border-brand-border p-6 space-y-6 animate-fade-in">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-brand-olive text-white rounded-xl shadow-3xs">
               <Compass className="w-5 h-5" />
@@ -934,7 +934,7 @@ export default function OutfitBuilder({
               <button
                 onClick={handleSaveManualOutfit}
                 disabled={!manualName || selectedItemIds.length === 0}
-                className="w-full py-3 bg-brand-olive text-white hover:bg-[#484833] disabled:bg-brand-sage/40 text-xs font-semibold uppercase tracking-widest rounded-[32px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-3xs"
+                className="w-full py-3 bg-brand-olive text-white hover:bg-[#484833] disabled:bg-brand-sage/40 text-xs font-semibold uppercase tracking-widest rounded-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-3xs"
               >
                 <Plus className="w-4 h-4" /> Save Look Set to Portfolio
               </button>
@@ -950,17 +950,17 @@ export default function OutfitBuilder({
         </h3>
 
         {savedOutfits.length === 0 ? (
-          <div className="border border-brand-border border-dashed rounded-[24px] p-12 text-center bg-white shadow-3xs select-none">
+          <div className="border border-brand-border border-dashed rounded-sm p-12 text-center bg-white shadow-3xs select-none">
             <Calendar className="w-8 h-8 text-brand-sage/50 mx-auto mb-3 animate-bounce" />
             <p className="text-brand-charcoal font-medium text-sm">Your Lookbook portfolio is currently empty.</p>
-            <p className="text-brand-sage text-xs mt-1">Use the Gemini Activity Matcher above or assemble tailored outfit boards manually!</p>
+            <p className="text-brand-sage text-xs mt-1">Use the the engine Activity Matcher above or assemble tailored outfit boards manually!</p>
           </div>
         ) : (
           <div className="space-y-5">
             {savedOutfits.map((outfit, index) => (
               <div
                 key={index}
-                className="bg-white rounded-[24px] border border-brand-border p-6 flex flex-col md:flex-row justify-between gap-6 relative shadow-xs hover:shadow-sm transition-shadow group overflow-hidden"
+                className="bg-white rounded-sm border border-brand-border p-6 flex flex-col md:flex-row justify-between gap-6 relative shadow-xs hover:shadow-sm transition-shadow group overflow-hidden"
               >
                 {/* Auto number indicator of pinned looks */}
                 <div className="absolute top-0 left-0 bg-brand-charcoal text-white px-3 py-1 text-[10px] font-mono font-bold rounded-br-2xl select-none shadow-3xs">

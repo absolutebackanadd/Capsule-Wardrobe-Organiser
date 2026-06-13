@@ -102,7 +102,7 @@ export default function WardrobeCard({ item, cardNumber, onSelect, onDelete, onT
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       whileHover={{ y: -4 }}
-      className="group relative bg-[#FAF9F6] rounded-[20px] border border-brand-border overflow-hidden flex flex-col justify-between shadow-[0_4px_12px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow"
+      className="group relative bg-[#FAF9F6] rounded-sm border border-brand-border overflow-hidden flex flex-col justify-between shadow-sm border-brand-border hover:shadow-md transition-shadow"
       id={`wardrobe-card-${item.id}`}
     >
       {/* Auto numbering badge */}
@@ -172,7 +172,7 @@ export default function WardrobeCard({ item, cardNumber, onSelect, onDelete, onT
 
         {/* Classic styled color swatch with thick border, bottom-right of visual card */}
         <div 
-          className="absolute bottom-3 right-3 w-6 h-6 rounded-full border-2 border-white shadow-[0_2px_4px_rgba(0,0,0,0.1)] z-10 transition-transform group-hover:scale-110"
+          className="absolute bottom-3 right-3 w-6 h-6 rounded-full border-2 border-white shadow-sm border-brand-border z-10 transition-transform group-hover:scale-110"
           style={{ backgroundColor: item.hex }}
           title={item.color}
         />
@@ -215,7 +215,7 @@ export default function WardrobeCard({ item, cardNumber, onSelect, onDelete, onT
               e.stopPropagation();
               if (onToggleStatus) onToggleStatus(item.id);
             }}
-            className={`self-start px-3 py-1 rounded-[20px] text-[10px] font-bold uppercase tracking-wider border transition-all ${
+            className={`self-start px-3 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider border transition-all ${
               isExisting
                 ? "bg-[#E8F0E8] text-[#4A674A] border-transparent hover:brightness-95"
                 : "bg-[#F8EEE8] text-[#A6705D] border-transparent hover:brightness-95"

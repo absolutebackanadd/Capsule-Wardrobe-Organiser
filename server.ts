@@ -10,8 +10,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "200mb" }));
+app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
 // Initialize Gemini safely
 let ai: GoogleGenAI | null = null;
@@ -31,6 +31,13 @@ function getGeminiClient(): GoogleGenAI {
     });
   }
   return ai;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number = 30000): Promise<T> {
+  const timeout = new Promise<T>((_, reject) => {
+    setTimeout(() => reject(new Error(`System Engine execution timed out after ${ms/1000}s. Please simplify your query.`)), ms);
+  });
+  return Promise.race([promise, timeout]);
 }
 
 // -------------------------------------------------------------------------
@@ -56,7 +63,7 @@ Personal Notes: ${notes || ""}
 
 Generate styling tags, a representative CSS hex color code (high accuracy based on the color description like "Navy Blue" -> "#1e293b", "Olive Green" -> "#3d5236", etc.), a standardized visual category (one of: Tops, Bottoms, Outerwear, Dresses, Shoes, Accessories), and concise chic styling advice for Capsule Wardrobes.`;
 
-    const response = await client.models.generateContent({
+    const response = await withTimeout(client.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -85,7 +92,7 @@ Generate styling tags, a representative CSS hex color code (high accuracy based 
           required: ["hex", "aiSuggestedCategory", "aiStyleTags", "aiStylingAdvice"]
         }
       }
-    });
+    }));
 
     const text = response.text?.trim() || "{}";
     const data = JSON.parse(text);
@@ -150,7 +157,7 @@ Each outfit should combine 2-4 items from the list. Try to mostly use "existing"
 
 Return exactly 3 outfit suggestions as a JSON array.`;
 
-    const response = await client.models.generateContent({
+    const responsePromise = client.models.generateContent({
       model: "gemini-3.5-flash",
       contents: JSON.stringify(miniItems) + "\n\n" + prompt,
       config: {
@@ -160,37 +167,24 @@ Return exactly 3 outfit suggestions as a JSON array.`;
           items: {
             type: Type.OBJECT,
             properties: {
-              name: {
-                type: Type.STRING,
-                description: "Short catchy name for the outfit vibe e.g., 'Monochrome Monday', 'French Market Picnic', 'Casual Office Layer'",
-              },
-              description: {
-                type: Type.STRING,
-                description: "A beautiful sensory description of the look and mood.",
-              },
-              itemIds: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "List of the exact string IDs of 2 to 4 items used from the provided wardrobe array.",
-              },
-              occasion: {
-                type: Type.STRING,
-                description: "Appropriate context e.g., 'Sunday Brunch', 'Boardroom Meeting', 'Gallery Opening'",
-              },
-              aesthetic: {
-                type: Type.STRING,
-                description: "Aesthetic vibe e.g., 'Quiet Luxury', 'French Chic', 'Artistic Minimalist'",
-              },
-              stylingNotes: {
-                type: Type.STRING,
-                description: "Practical editorial styling tips e.g., 'Tuck the shirt loosely and role up the sleeves; contrast with dark boots.'",
-              }
+              name: { type: Type.STRING },
+              description: { type: Type.STRING },
+              itemIds: { type: Type.ARRAY, items: { type: Type.STRING } },
+              occasion: { type: Type.STRING },
+              aesthetic: { type: Type.STRING },
+              stylingNotes: { type: Type.STRING }
             },
             required: ["name", "description", "itemIds", "occasion", "aesthetic", "stylingNotes"]
           }
         }
       }
     });
+
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Gemini AI request timed out after 45 seconds")), 45000)
+    );
+
+    const response = await Promise.race([responsePromise, timeoutPromise]) as any;
 
     const text = response.text?.trim() || "[]";
     const data = JSON.parse(text);
@@ -214,7 +208,7 @@ app.post("/api/gemini/explore-ideas", async (req, res) => {
     const prompt = `The user wants ideas for clothing items to add to their Capsule Wardrobe matching this search / style vibe: "${query}"
 Generate 4 perfect items that would fit this aesthetic. Include standardized categories, colors, brands that make high-quality versions, crisp descriptions, and notes on why they make solid capsule wardrobe investments. All response fields must be stylish and realistic labels. Generate 4 items.`;
 
-    const response = await client.models.generateContent({
+    const response = await withTimeout(client.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -257,7 +251,7 @@ Generate 4 perfect items that would fit this aesthetic. Include standardized cat
           }
         }
       }
-    });
+    }));
 
     const text = response.text?.trim() || "[]";
     const data = JSON.parse(text);
@@ -469,7 +463,7 @@ Return exactly this JSON response format:
   ]
 }`;
 
-    const response = await client.models.generateContent({
+    const response = await withTimeout(client.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -501,7 +495,7 @@ Return exactly this JSON response format:
           required: ["capsuleSummaryKeywords", "capsuleDescription", "notesEnrichment"]
         }
       }
-    });
+    }));
 
     const parsed = JSON.parse(response.text?.trim() || "{}");
     res.json(parsed);
@@ -551,7 +545,7 @@ Return exactly this JSON response format:
   ]
 }`;
 
-    const response = await client.models.generateContent({
+    const response = await withTimeout(client.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -581,7 +575,7 @@ Return exactly this JSON response format:
           required: ["generalGapAssessment", "suggestedItemsToBuy"]
         }
       }
-    });
+    }));
 
     const parsed = JSON.parse(response.text?.trim() || "{}");
     res.json(parsed);
@@ -622,7 +616,7 @@ Return exactly this JSON response format with "categoryMappings" as an array of 
   ]
 }`;
 
-    const response = await client.models.generateContent({
+    const response = await withTimeout(client.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -652,7 +646,7 @@ Return exactly this JSON response format with "categoryMappings" as an array of 
           required: ["categoryMappings"]
         }
       }
-    });
+    }));
 
     const parsed = JSON.parse(response.text?.trim() || "{}");
     const dictionary: Record<string, string> = {};

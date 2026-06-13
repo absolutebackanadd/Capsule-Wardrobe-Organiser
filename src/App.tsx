@@ -178,14 +178,15 @@ export default function App() {
     }
   };
 
-  // Trigger Gemini item analysis to enrich color codes & styling recommendations
+  // Trigger System Engine item analysis to enrich color codes & styling recommendations
   const handleAnalyzeItem = async (targetItem: WardrobeItem) => {
     setAiLoading(true);
     try {
+      const { imageUrl, ...sanitizedItem } = targetItem;
       const response = await fetch("/api/gemini/analyze-item", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(targetItem)
+        body: JSON.stringify(sanitizedItem)
       });
       if (response.ok) {
         const enriched = await response.json();
@@ -420,7 +421,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: aiAutofillQuery })
       });
-      // Try resolving directly under Gemini suggestions
+      // Try resolving directly under System Engine suggestions
       const searchRes = await fetch("/api/gemini/explore-ideas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -595,7 +596,7 @@ export default function App() {
       season: fallbackSeason,
       aiSuggestedCategory: rec.category || "Tops",
       aiStyleTags: ["Suggested", "Gap Filler", activeSeason],
-      aiStylingAdvice: "This item was recommended by Gemini styling analytics to boost looks versatility!"
+      aiStylingAdvice: "This item was recommended by System Engine styling analytics to boost looks versatility!"
     };
 
     setWardrobe(prev => [added, ...prev]);
@@ -730,20 +731,20 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-brand-alabaster text-brand-charcoal font-sans flex flex-col antialiased">
+    <div className="min-h-screen bg-brand-alabaster text-brand-charcoal font-sans flex flex-col antialiased selection:bg-brand-brown selection:text-white">
       {/* Editorial Header Banner */}
-      <header className="border-b border-brand-border bg-brand-greige/60 sticky top-0 z-30 backdrop-blur-md">
+      <header className="border-b border-brand-border bg-white/80 sticky top-0 z-30 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-full border border-brand-olive/30 bg-brand-olive text-white flex items-center justify-center font-bold tracking-tighter text-sm font-serif italic shadow-sm">
+          <div className="flex items-center gap-4">
+            <span className="w-10 h-10 rounded bg-brand-charcoal text-white flex items-center justify-center font-bold tracking-tight text-lg font-serif">
               C.
             </span>
             <div>
-              <h1 className="font-serif italic font-semibold text-brand-olive text-2xl tracking-tight leading-none">
-                Capsule.
+              <h1 className="font-serif font-semibold text-brand-charcoal text-xl tracking-tight leading-none">
+                Capsule Wardrobe
               </h1>
-              <p className="text-brand-sage text-[11px] font-sans mt-0.5 font-bold uppercase tracking-widest">
-                Wardrobe Manager v1.0
+              <p className="text-brand-sage text-[10px] font-mono mt-1 uppercase tracking-widest">
+                System Manager v1.2
               </p>
             </div>
           </div>
@@ -753,18 +754,18 @@ export default function App() {
             {wardrobe.length > 0 && (
               <button
                 onClick={handleDownloadBackup}
-                className="hidden sm:flex items-center gap-1.5 px-6 py-3 bg-brand-olive text-white font-bold text-[10px] tracking-widest uppercase rounded-[32px] transition-all hover:bg-[#484833] cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-5 py-2.5 bg-white border border-brand-border text-brand-charcoal font-semibold text-[10px] tracking-widest uppercase rounded hover:bg-brand-greige cursor-pointer transition-colors"
                 title="Saves and updates your .xlsx / .csv backup sheet instantly"
               >
-                <Download className="w-3.5 h-3.5" /> Save to Spreadsheet
+                <Download className="w-3.5 h-3.5" /> Export Data
               </button>
             )}
 
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1.5 px-6 py-3 bg-brand-olive text-white hover:bg-[#484833] font-semibold text-xs tracking-tight rounded-[32px] transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-brand-charcoal text-white hover:bg-black font-semibold text-[10px] tracking-widest uppercase rounded cursor-pointer transition-colors shadow-sm"
             >
-              <Plus className="w-4 h-4" /> Add Clothes Item
+              <Plus className="w-4 h-4" /> Add Item
             </button>
           </div>
         </div>
@@ -772,10 +773,10 @@ export default function App() {
         {/* Global tab layouts */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-8 -mb-px">
           {[
-            { id: "closet", label: "My Digital Closet", icon: Grid },
-            { id: "planner", label: "Capsule Lookbook", icon: BookOpen },
-            { id: "insights", label: "Color Story & Vibe", icon: PieChart },
-            { id: "dataset", label: "Spreadsheet Hub", icon: FileSpreadsheet }
+            { id: "closet", label: "Inventory", icon: Grid },
+            { id: "planner", label: "Lookbook", icon: BookOpen },
+            { id: "insights", label: "Analytics", icon: PieChart },
+            { id: "dataset", label: "Dataset Hub", icon: FileSpreadsheet }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -783,9 +784,9 @@ export default function App() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`py-3 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all shrink-0 cursor-pointer ${
+                className={`py-3.5 text-[11px] font-semibold uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors shrink-0 cursor-pointer ${
                   isActive
-                    ? "border-brand-olive text-brand-olive font-bold"
+                    ? "border-brand-charcoal text-brand-charcoal"
                     : "border-transparent text-brand-sage hover:text-brand-charcoal hover:border-brand-border"
                 }`}
               >
@@ -808,7 +809,7 @@ export default function App() {
               className="space-y-6"
             >
               {/* Season Selection & Planning Hub */}
-              <div className="bg-white border border-brand-border rounded-[24px] p-5.5 shadow-[0_4px_20px_rgba(0,0,0,0.015)] space-y-4">
+              <div className="bg-white border border-brand-border rounded-sm p-5.5 shadow-sm border-brand-border space-y-4">
                 {/* Segmented Top Control (Actual vs Future) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-border/60 pb-3">
                   <div className="flex bg-brand-greige/60 p-1.5 rounded-full border border-brand-border/40">
@@ -823,7 +824,7 @@ export default function App() {
                           : "text-brand-sage hover:text-brand-charcoal"
                       }`}
                     >
-                      📅 Actual Closet Collections
+                       Actual Closet Collections
                     </button>
                     <button
                       onClick={() => {
@@ -836,12 +837,12 @@ export default function App() {
                           : "text-brand-sage hover:text-brand-charcoal"
                       }`}
                     >
-                      ⭐️ Future Planning
+                       Future Planning
                     </button>
                   </div>
 
                   <span className="text-[10px] uppercase font-bold text-brand-sage tracking-widest font-sans px-2.5">
-                    {activeSeasonTab === "actual" ? "✨ Viewing Owned Wardrobes" : "🎯 Planning & Wishlist Spec"}
+                    {activeSeasonTab === "actual" ? " Viewing Owned Wardrobes" : " Planning & Wishlist Spec"}
                   </span>
                 </div>
 
@@ -849,11 +850,11 @@ export default function App() {
                 {activeSeasonTab === "actual" && (
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     {[
-                      { id: "all_actual", label: "✨ All Actual Pieces" },
-                      { id: "Summer 25-26", label: "☀️ Summer 25-26" },
-                      { id: "Autumn 26", label: "🍁 Autumn 26" },
-                      { id: "Winter 26", label: "❄️ Winter 26" },
-                      { id: "Handbag Inventory", label: "💼 Handbag Inventory" }
+                      { id: "all_actual", label: "All Actual Pieces" },
+                      { id: "Summer 25-26", label: "Summer 25-26" },
+                      { id: "Autumn 26", label: "Autumn 26" },
+                      { id: "Winter 26", label: "Winter 26" },
+                      { id: "Handbag Inventory", label: "Handbag Inventory" }
                     ].map(sub => (
                       <button
                         key={sub.id}
@@ -874,7 +875,7 @@ export default function App() {
                 {activeSeasonTab === "future" && (
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     {[
-                      { id: "Dream AW", label: "⭐️ Dream AW Future Capsule" }
+                      { id: "Dream AW", label: "Dream AW Future Capsule" }
                     ].map(sub => (
                       <button
                         key={sub.id}
@@ -899,22 +900,22 @@ export default function App() {
                 if (!activeSeasonConfig) return null;
 
                 return (
-                  <div className="bg-brand-greige/25 border border-brand-border rounded-[24px] p-6 space-y-4 shadow-3xs">
+                  <div className="bg-brand-greige/25 border border-brand-border rounded-sm p-6 space-y-4 shadow-3xs">
                     <div className="flex items-center justify-between flex-wrap gap-4">
                       <div className="flex items-center gap-3">
                         <div className="w-11 h-11 bg-white border border-brand-border/60 rounded-xl flex items-center justify-center text-lg shadow-3xs">
-                          {activeSeasonConfig.id === "Summer 25-26" && "☀️"}
-                          {activeSeasonConfig.id === "Autumn 26" && "🍁"}
-                          {activeSeasonConfig.id === "Winter 26" && "❄️"}
-                          {activeSeasonConfig.id === "Handbag Inventory" && "💼"}
-                          {activeSeasonConfig.id === "Dream AW" && "⭐️"}
+                          {activeSeasonConfig.id === "Summer 25-26" && ""}
+                          {activeSeasonConfig.id === "Autumn 26" && ""}
+                          {activeSeasonConfig.id === "Winter 26" && ""}
+                          {activeSeasonConfig.id === "Handbag Inventory" && ""}
+                          {activeSeasonConfig.id === "Dream AW" && ""}
                         </div>
                         <div>
                           <h3 className="font-serif italic font-medium text-brand-charcoal text-base">
                             {activeSeasonConfig.id === "Handbag Inventory" ? "Handbag Setup & Ratings Guide" : activeSeasonConfig.summaryTitle}
                           </h3>
                           <p className="text-brand-sage text-[10px] uppercase tracking-wider font-sans font-bold">
-                            {activeSeasonTab === "future" ? "📅 future Roadmap & planning rules" : "🌿 capsule functional guideline"}
+                            {activeSeasonTab === "future" ? " future Roadmap & planning rules" : " capsule functional guideline"}
                           </p>
                         </div>
                       </div>
@@ -949,19 +950,19 @@ export default function App() {
                 );
               })()}
 
-              {/* Gemini Wardrobe Studio Card Dashboard */}
-              <div className="bg-white border border-brand-border/80 rounded-[24px] p-6 shadow-[0_6px_24px_rgba(0,0,0,0.015)] space-y-6">
+              {/* Analysis Engine Dashboard */}
+              <div className="bg-white border border-brand-border/80 rounded-sm p-6 shadow-sm border-brand-border space-y-6">
                 <div className="flex items-center justify-between flex-wrap gap-4 border-b border-brand-border/40 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#E8F0E8]/50 border border-brand-olive/20 rounded-xl flex items-center justify-center text-brand-olive shadow-2xs">
-                      <Sparkles className="w-5 h-5 animate-pulse" />
+                    <div className="w-10 h-10 bg-brand-charcoal text-white rounded-lg flex items-center justify-center shadow-sm">
+                      <SlidersHorizontal className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-serif italic font-semibold text-brand-charcoal text-lg">
-                        Gemini Wardrobe Studio
+                      <h3 className="font-serif font-semibold text-brand-charcoal text-lg tracking-tight">
+                        Analysis Engine
                       </h3>
-                      <p className="text-[#4A674A] text-[9px] uppercase tracking-widest font-sans font-bold">
-                        🧠 COGNITIVE CAPSULE INTELLIGENCE
+                      <p className="text-brand-sage text-[9px] uppercase tracking-widest font-mono font-bold mt-1">
+                        System Diagnostics & Processing
                       </p>
                     </div>
                   </div>
@@ -984,7 +985,7 @@ export default function App() {
                     ) : (
                       <>
                         <Sparkles className="w-3.5 h-3.5 text-brand-olive" />
-                        ✨ Style Summary & Notes
+                         Style Summary & Notes
                       </>
                     )}
                   </button>
@@ -1002,7 +1003,7 @@ export default function App() {
                     ) : (
                       <>
                         <Search className="w-3.5 h-3.5 text-[#A6705D]" />
-                        🔍 Scan Wardrobe Gaps
+                         Scan Wardrobe Gaps
                       </>
                     )}
                   </button>
@@ -1020,7 +1021,7 @@ export default function App() {
                     ) : (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 text-brand-sage" />
-                        📁 Condense Excel Categories
+                         Condense Excel Categories
                       </>
                     )}
                   </button>
@@ -1041,12 +1042,12 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Gemini Style Summary & note appender output */}
+                {/* System Engine Style Summary & note appender output */}
                 {capsuleDescription && (
                   <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
                     <div className="space-y-1">
                       <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
-                        🎯 Style Summary & Keyword Aesthetics
+                         Style Summary & Keyword Aesthetics
                       </h4>
                       <div className="flex flex-wrap gap-2 pt-1 border-b border-brand-border/40 pb-3.5">
                         {capsuleSummaryKeywords.map((kw, i) => (
@@ -1163,9 +1164,9 @@ export default function App() {
                   <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
                     <div>
                       <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
-                        📁 AI Spreadsheet Clean Map Output
+                         AI Spreadsheet Clean Map Output
                       </h4>
-                      <p className="text-[10.5px] text-brand-sage mt-0.5">Gemini will group these non-standard labels into neat apparel folders:</p>
+                      <p className="text-[10.5px] text-brand-sage mt-0.5">System Engine will group these non-standard labels into neat apparel folders:</p>
                     </div>
 
                     <div className="max-h-[160px] overflow-y-auto bg-white border border-brand-border p-3.5 rounded-xl divide-y divide-stone-100 pr-1">
@@ -1203,7 +1204,7 @@ export default function App() {
 
                 {condenseSuccess && (
                   <p className="text-xs text-[#4A674A] bg-[#E8F0E8] p-3.5 rounded-lg border border-brand-olive/20">
-                    🌿 {condenseSuccess}
+                     {condenseSuccess}
                   </p>
                 )}
 
@@ -1259,7 +1260,7 @@ export default function App() {
               </div>
 
               {/* Dynamic Filter Controls Bar in Greige box */}
-              <div className="bg-brand-greige/45 border border-brand-border p-5 rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-4">
+              <div className="bg-brand-greige/45 border border-brand-border p-5 rounded-sm shadow-sm border-brand-border space-y-4">
                 <div className="flex flex-col md:flex-row gap-3">
                   {/* Search */}
                   <div className="relative flex-1">
@@ -1269,7 +1270,7 @@ export default function App() {
                       placeholder="Search brand, color, or item (pants, trench coat, COS blazer)..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-brand-border text-brand-charcoal text-xs pl-11 pr-4 py-3 rounded-[32px] focus:ring-1 focus:ring-brand-olive focus:outline-none transition-all placeholder-brand-sage/80"
+                      className="w-full bg-white border border-brand-border text-brand-charcoal text-xs pl-11 pr-4 py-3 rounded-sm focus:ring-1 focus:ring-brand-olive focus:outline-none transition-all placeholder-brand-sage/80"
                     />
                   </div>
 
@@ -1279,7 +1280,7 @@ export default function App() {
                       <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[125px] focus:ring-1 focus:ring-brand-olive text-left"
+                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[125px] focus:ring-1 focus:ring-brand-olive text-left"
                       >
                         <option value="all">All Apparel</option>
                         {Array.from(new Set(wardrobe.map(w => w.aiSuggestedCategory || "Tops"))).filter((cat): cat is string => !!cat).map(cat => (
@@ -1294,7 +1295,7 @@ export default function App() {
                       <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
                       >
                         <option value="all">All Stats</option>
                         <option value="existing">In Closet</option>
@@ -1309,7 +1310,7 @@ export default function App() {
                         <select
                           value={brandFilter}
                           onChange={(e) => setBrandFilter(e.target.value)}
-                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
                         >
                           <option value="all">All Brands</option>
                           {uniqueBrands.map(br => (
@@ -1326,7 +1327,7 @@ export default function App() {
                         <select
                           value={colorFilter}
                           onChange={(e) => setColorFilter(e.target.value)}
-                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
                         >
                           <option value="all">All Colors</option>
                           {uniqueColors.map(col => (
@@ -1456,7 +1457,7 @@ export default function App() {
                   </AnimatePresence>
                 </div>
               ) : (
-                <div className="bg-white border border-brand-border rounded-[20px] overflow-hidden shadow-xs animate-fade-in overflow-x-auto">
+                <div className="bg-white border border-brand-border rounded-sm overflow-hidden shadow-xs animate-fade-in overflow-x-auto">
                   <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                       <tr className="bg-brand-greige/30 border-b border-brand-border/60 text-brand-sage uppercase text-[10px] font-bold tracking-wider select-none">
@@ -1544,7 +1545,7 @@ export default function App() {
                                     e.stopPropagation();
                                     handleToggleStatus(item.id);
                                   }}
-                                  className={`px-3 py-1 rounded-[20px] text-[9px] font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                                  className={`px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-wider border transition-all cursor-pointer ${
                                     isExisting
                                       ? "bg-[#E8F0E8] text-[#4A674A] border-transparent"
                                       : "bg-[#F8EEE8] text-[#A6705D] border-transparent"
@@ -1765,11 +1766,11 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* Curated Gemini AI Styling Insight block */}
+                    {/* Curated System Engine AI Styling Insight block */}
                     <div className="border border-stone-200/80 rounded-xl p-4.5 bg-stone-50/40 relative space-y-3.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] uppercase font-bold text-stone-400 tracking-widest font-mono flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-stone-500 animate-pulse" /> Gemini Look Director Advice
+                          <Sparkles className="w-3 h-3 text-stone-500 animate-pulse" /> System Engine Look Director Advice
                         </span>
 
                         <button
@@ -2001,11 +2002,11 @@ export default function App() {
                         onChange={(e) => setSelectedItem({ ...selectedItem, season: e.target.value })}
                         className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
                       >
-                        <option value="Summer 25-26">☀️ Summer capsule 2025 - 26</option>
-                        <option value="Autumn 26">🍁 Autumn 26</option>
-                        <option value="Winter 26">❄️ Winter capsule 2026</option>
-                        <option value="Handbag Inventory">💼 Handbag Inventory</option>
-                        <option value="Dream AW">⭐️ Dream AW (Future Planning)</option>
+                        <option value="Summer 25-26/">Summer capsule 2025 - 26</option>
+                        <option value="Autumn 26/">Autumn 26</option>
+                        <option value="Winter 26/">Winter capsule 2026</option>
+                        <option value="Handbag Inventory/">Handbag Inventory</option>
+                        <option value="Dream AW/">Dream AW (Future Planning)</option>
                       </select>
                     </div>
 
@@ -2092,7 +2093,7 @@ export default function App() {
                     Introduce Clothes Piece
                   </h3>
                   <p className="text-stone-400 text-[11px] mt-0.5">
-                    Log manually or autofill styled apparel matching specific wish vibes using Gemini.
+                    Log manually or autofill styled apparel matching specific wish vibes using System Engine.
                   </p>
                 </div>
                 <button
@@ -2103,7 +2104,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Gemini smart search autofill box */}
+              {/* System Engine smart search autofill box */}
               <div className="bg-stone-50 border border-stone-100 p-4 rounded-xl space-y-3">
                 <span className="text-[9px] uppercase font-bold text-stone-400 tracking-widest font-mono flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-stone-500" /> AI Style Ideas Autofiller
@@ -2346,11 +2347,11 @@ export default function App() {
                     onChange={(e) => setNewItem({ ...newItem, season: e.target.value })}
                     className="w-full bg-white border border-stone-200 text-stone-850 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
                   >
-                    <option value="Summer 25-26">☀️ Summer capsule 2025 - 26</option>
-                    <option value="Autumn 26">🍁 Autumn 26</option>
-                    <option value="Winter 26">❄️ Winter capsule 2026</option>
-                    <option value="Handbag Inventory">💼 Handbag Inventory</option>
-                    <option value="Dream AW">⭐️ Dream AW (Future Planning)</option>
+                    <option value="Summer 25-26/">Summer capsule 2025 - 26</option>
+                    <option value="Autumn 26/">Autumn 26</option>
+                    <option value="Winter 26/">Winter capsule 2026</option>
+                    <option value="Handbag Inventory/">Handbag Inventory</option>
+                    <option value="Dream AW/">Dream AW (Future Planning)</option>
                   </select>
                 </div>
 
@@ -2378,7 +2379,7 @@ export default function App() {
       {/* Elegant Styled Footer */}
       <footer className="border-t border-stone-200 bg-white py-10 mt-12 text-center text-xs text-stone-400 space-y-1 font-mono">
         <p>© {new Date().getFullYear()} Capsule Wardrobe Studio • Designed for local custom closets.</p>
-        <p>Connected with server-side Gemini 3.5 AI look directors.</p>
+        <p>Connected with server-side System Engine 3.5 AI look directors.</p>
       </footer>
     </div>
   );
