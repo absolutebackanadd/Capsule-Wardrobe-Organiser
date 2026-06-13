@@ -12,6 +12,7 @@ export interface WardrobeItem {
   aiStylingAdvice?: string;
   aiSuggestedCategory?: string; // Standardized wardrobe category
   imageUrl?: string;             // Auto-discovered representative look image
+  masterId?: string;             // Unique primary key identifying the physical garment across different season capsules
 }
 
 export interface OutfitSuggestion {

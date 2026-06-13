@@ -956,12 +956,18 @@ export default function OutfitBuilder({
             <p className="text-brand-sage text-xs mt-1">Use the the engine Activity Matcher above or assemble tailored outfit boards manually!</p>
           </div>
         ) : (
-          <div className="space-y-5">
-            {savedOutfits.map((outfit, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-sm border border-brand-border p-6 flex flex-col md:flex-row justify-between gap-6 relative shadow-xs hover:shadow-sm transition-shadow group overflow-hidden"
-              >
+          <motion.div layout className="space-y-5">
+            <AnimatePresence mode="popLayout">
+              {savedOutfits.map((outfit, index) => (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -50, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30, delay: index * 0.05 }}
+                  key={`saved-outfit-${index}-${outfit.name}`}
+                  className="bg-white rounded-sm border border-brand-border p-6 flex flex-col md:flex-row justify-between gap-6 relative shadow-xs hover:shadow-sm transition-shadow group overflow-hidden"
+                >
                 {/* Auto number indicator of pinned looks */}
                 <div className="absolute top-0 left-0 bg-brand-charcoal text-white px-3 py-1 text-[10px] font-mono font-bold rounded-br-2xl select-none shadow-3xs">
                   Portfolio Set #{index + 1}
@@ -1046,9 +1052,10 @@ export default function OutfitBuilder({
                     </div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+            </AnimatePresence>
+          </motion.div>
         )}
       </div>
     </div>

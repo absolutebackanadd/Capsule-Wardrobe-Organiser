@@ -5,6 +5,7 @@ import WardrobeCard, { ApparelSilhouette } from "./components/WardrobeCard";
 import OutfitBuilder from "./components/OutfitBuilder";
 import AnalyticsPanel from "./components/AnalyticsPanel";
 import ExcelImporter from "./components/ExcelImporter";
+import DuplicateSorter from "./components/DuplicateSorter";
 import {
   Search,
   SlidersHorizontal,
@@ -34,12 +35,28 @@ import { motion, AnimatePresence } from "motion/react";
 export default function App() {
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>([]);
   const [savedOutfits, setSavedOutfits] = useState<OutfitSuggestion[]>([]);
-  const [activeTab, setActiveTab] = useState<"closet" | "planner" | "insights" | "dataset">("closet");
+  const [activeTab, setActiveTab] = useState<"closet" | "planner" | "insights" | "dataset" | "dedupe">("closet");
   
   // Seasons and planning state filter
   const [activeSeasonTab, setActiveSeasonTab] = useState<"actual" | "future">("actual");
   const [activeSeason, setActiveSeason] = useState<string>("all_actual");
   const [isStyleSummaryExpanded, setIsStyleSummaryExpanded] = useState(true);
+
+  // Load default season
+  useEffect(() => {
+    const defaultSeason = localStorage.getItem("capsule_closet_default_capsule");
+    if (defaultSeason) {
+      if (defaultSeason === "Dream AW") {
+        setActiveSeasonTab("future");
+      }
+      setActiveSeason(defaultSeason);
+    }
+  }, []);
+
+  const handleSetDefaultSeason = () => {
+    localStorage.setItem("capsule_closet_default_capsule", activeSeason);
+    // Could add brief toast/alert here if desired
+  };
 
   // Selection and search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -93,6 +110,8 @@ export default function App() {
   const [aiAutofillQuery, setAiAutofillQuery] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [isDetailEditing, setIsDetailEditing] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
+  const [cloneSeason, setCloneSeason] = useState("Summer 25-26");
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -155,6 +174,35 @@ export default function App() {
     }
   };
 
+  const handleCloneToCapsule = () => {
+    if (!selectedItem) return;
+    
+    // Check if item already exists in that capsule
+    const exists = wardrobe.some(w => 
+      (w.id === selectedItem.id || w.masterId === (selectedItem.masterId || selectedItem.id)) && 
+      w.season === cloneSeason
+    );
+    
+    if (exists) {
+      alert(`This item is already in ${cloneSeason}.`);
+      return;
+    }
+
+    const newId = `cloned-${Date.now()}`;
+    const masterId = selectedItem.masterId || selectedItem.id;
+    
+    const clonedItem: WardrobeItem = {
+      ...selectedItem,
+      id: newId,
+      masterId: masterId,
+      season: cloneSeason,
+    };
+    
+    setWardrobe(prev => [...prev, clonedItem]);
+    alert(`Successfully added to ${cloneSeason}!`);
+    setIsCloning(false);
+  };
+
   const handleDeleteItem = (id: string) => {
     setWardrobe(prev => prev.filter(i => i.id !== id));
     if (selectedItem?.id === id) {
@@ -202,6 +250,15 @@ export default function App() {
             setSelectedItem(updated);
             return updated;
           }
+          if (targetItem.masterId && item.masterId === targetItem.masterId) {
+            return {
+              ...item,
+              hex: enriched.hex || item.hex,
+              aiSuggestedCategory: enriched.aiSuggestedCategory || item.aiSuggestedCategory,
+              aiStyleTags: enriched.aiStyleTags || ["Aesthetic Class"],
+              aiStylingAdvice: enriched.aiStylingAdvice || "Classic wear coordinates."
+            };
+          }
           return item;
         });
         setWardrobe(updatedList);
@@ -231,6 +288,9 @@ export default function App() {
         const imageUrl = data.imageUrl || "";
         const updatedList = wardrobe.map(item => {
           if (item.id === targetItem.id) {
+            return { ...item, imageUrl };
+          }
+          if (targetItem.masterId && item.masterId === targetItem.masterId) {
             return { ...item, imageUrl };
           }
           return item;
@@ -452,7 +512,27 @@ export default function App() {
 
   // Save changes done to specific wardrobe cards
   const handleSaveEditedDetails = (updated: WardrobeItem) => {
-    setWardrobe(prev => prev.map(item => item.id === updated.id ? updated : item));
+    setWardrobe(prev => prev.map(item => {
+      if (item.id === updated.id) {
+        return updated;
+      }
+      if (updated.masterId && item.masterId === updated.masterId) {
+        return {
+          ...item,
+          item: updated.item,
+          color: updated.color,
+          hex: updated.hex,
+          description: updated.description,
+          brand: updated.brand,
+          notes: updated.notes,
+          aiSuggestedCategory: updated.aiSuggestedCategory || item.aiSuggestedCategory,
+          aiStyleTags: updated.aiStyleTags || item.aiStyleTags,
+          aiStylingAdvice: updated.aiStylingAdvice || item.aiStylingAdvice,
+          imageUrl: updated.imageUrl || item.imageUrl
+        };
+      }
+      return item;
+    }));
     setSelectedItem(updated);
     setIsDetailEditing(false);
   };
@@ -776,7 +856,8 @@ export default function App() {
             { id: "closet", label: "Inventory", icon: Grid },
             { id: "planner", label: "Lookbook", icon: BookOpen },
             { id: "insights", label: "Analytics", icon: PieChart },
-            { id: "dataset", label: "Dataset Hub", icon: FileSpreadsheet }
+            { id: "dataset", label: "Dataset Hub", icon: FileSpreadsheet },
+            { id: "dedupe", label: "Duplicate Sorter", icon: Link }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -841,9 +922,20 @@ export default function App() {
                     </button>
                   </div>
 
-                  <span className="text-[10px] uppercase font-bold text-brand-sage tracking-widest font-sans px-2.5">
-                    {activeSeasonTab === "actual" ? " Viewing Owned Wardrobes" : " Planning & Wishlist Spec"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-brand-sage tracking-widest font-sans px-2.5">
+                      {activeSeasonTab === "actual" ? " Viewing Owned Wardrobes" : " Planning & Wishlist Spec"}
+                    </span>
+                    {activeSeason !== "all_actual" && (
+                      <button
+                        onClick={handleSetDefaultSeason}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-1 bg-[#FAF9F6] border border-brand-border/80 text-brand-sage hover:text-brand-charcoal hover:border-brand-sage rounded transition-colors cursor-pointer"
+                        title="Set this capsule to be pre-selected in the planner"
+                      >
+                        Set Default
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Sub-pills for Actual Wardrobes */}
@@ -1631,6 +1723,19 @@ export default function App() {
               />
             </motion.div>
           )}
+
+          {activeTab === "dedupe" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <DuplicateSorter
+                wardrobe={wardrobe}
+                onUpdateWardrobe={(newWardrobe) => setWardrobe(newWardrobe)}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -2028,6 +2133,32 @@ export default function App() {
                 )}
               </div>
 
+              {/* Duplicate / Clone section */}
+              {!isDetailEditing && (
+                <div className="border-t border-stone-100 pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-[10px] font-bold uppercase text-stone-500">Duplicate to:</label>
+                    <select
+                      value={cloneSeason}
+                      onChange={e => setCloneSeason(e.target.value)}
+                      className="text-xs bg-stone-50 border border-stone-200 rounded-md py-1 px-2 text-stone-700 outline-none"
+                    >
+                      <option value="Summer 25-26">Summer capsule 2025 - 26</option>
+                      <option value="Autumn 26">Autumn 26</option>
+                      <option value="Winter 26">Winter capsule 2026</option>
+                      <option value="Handbag Inventory">Handbag Inventory</option>
+                      <option value="Dream AW">Dream AW (Future Planning)</option>
+                    </select>
+                    <button
+                      onClick={handleCloneToCapsule}
+                      className="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-semibold px-3 py-1 rounded-md transition-colors"
+                    >
+                      Add/Link
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Drawer footer actions */}
               <div className="flex items-center gap-2 border-t border-stone-100 pt-4">
                 {!isDetailEditing ? (
@@ -2036,7 +2167,7 @@ export default function App() {
                       onClick={() => setIsDetailEditing(true)}
                       className="flex-1 py-2.5 bg-stone-900 text-stone-50 font-bold text-xs uppercase tracking-wider rounded-xl transition-all hover:bg-stone-800"
                     >
-                      Edit Clothes Card
+                      Edit Garment Details
                     </button>
                     <button
                       onClick={() => {
