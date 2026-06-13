@@ -614,17 +614,12 @@ Please map each unique category/title to exactly one of our 6 standard elegant c
 - "Shoes"
 - "Accessories"
 
-Return a key-value mapping object where the keys are the original labels and the values are their mapped standardized counterparts.
-
-Return exactly this JSON response format:
+Return exactly this JSON response format with "categoryMappings" as an array of original to standard category mapping pairs:
 {
-  "categoryMapping": {
-    "pant": "Bottoms",
-    "boot": "Shoes",
-    "chelsea boots": "Shoes",
-    "silk t-shirt": "Tops",
-    "shacket": "Outerwear"
-  }
+  "categoryMappings": [
+    { "original": "pant", "standard": "Bottoms" },
+    { "original": "boot", "standard": "Shoes" }
+  ]
 }`;
 
     const response = await client.models.generateContent({
@@ -635,18 +630,42 @@ Return exactly this JSON response format:
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            categoryMapping: {
-              type: Type.OBJECT,
-              description: "A dictionary mapping original messy category strings to standard neat ones from our list."
+            categoryMappings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  original: {
+                    type: Type.STRING,
+                    description: "The original category label from the spreadsheet list."
+                  },
+                  standard: {
+                    type: Type.STRING,
+                    description: "The matched standard capsule category (exactly one of: Tops, Bottoms, Outerwear, Dresses, Shoes, Accessories)."
+                  }
+                },
+                required: ["original", "standard"]
+              },
+              description: "List of maps pairing original custom category/item-type names to standard ones."
             }
           },
-          required: ["categoryMapping"]
+          required: ["categoryMappings"]
         }
       }
     });
 
     const parsed = JSON.parse(response.text?.trim() || "{}");
-    res.json(parsed);
+    const dictionary: Record<string, string> = {};
+    if (parsed.categoryMappings && Array.isArray(parsed.categoryMappings)) {
+      parsed.categoryMappings.forEach((m: any) => {
+        if (m.original && m.standard) {
+          dictionary[m.original.trim()] = m.standard.trim();
+        }
+      });
+    } else if (parsed.categoryMapping) {
+      Object.assign(dictionary, parsed.categoryMapping);
+    }
+    res.json({ categoryMapping: dictionary });
   } catch (error: any) {
     console.error("Error condensing categories with Gemini:", error);
     res.status(500).json({ error: "Failed to map standard categories", details: error.message });
