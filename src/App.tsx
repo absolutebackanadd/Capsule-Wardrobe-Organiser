@@ -103,13 +103,6 @@ export default function App() {
     localStorage.setItem("capsule_closet_outfits", JSON.stringify(savedOutfits));
   }, [savedOutfits]);
 
-  // Dynamic lookup of representative images when viewing or selecting a closet garment
-  useEffect(() => {
-    if (selectedItem && !selectedItem.imageUrl) {
-      handleFetchItemImage(selectedItem);
-    }
-  }, [selectedItem?.id]);
-
   // Export to local download file
   const handleDownloadBackup = () => {
     const csvContent = exportToCSVString(wardrobe);
@@ -341,30 +334,7 @@ export default function App() {
       aiStylingAdvice: "Tap 'Enrich item Advice' to generate styling reviews!"
     };
 
-    if (newItem.imageUrl) {
-      added.imageUrl = newItem.imageUrl;
-    } else {
-      try {
-        // Discover a representative styling image during saving
-        const imageRes = await fetch("/api/image-search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            item: added.item,
-            color: added.color,
-            brand: added.brand
-          })
-        });
-        if (imageRes.ok) {
-          const imgData = await imageRes.json();
-          if (imgData.imageUrl) {
-            added.imageUrl = imgData.imageUrl;
-          }
-        }
-      } catch (err) {
-        console.error("Error auto-fetching added garment visual:", err);
-      }
-    }
+    added.imageUrl = newItem.imageUrl || "";
 
     setWardrobe(prev => [added, ...prev]);
     setFormSuccess(`Direct addition of '${added.brand} ${added.item}' successful!`);
