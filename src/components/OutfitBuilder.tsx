@@ -28,10 +28,51 @@ interface OutfitBuilderProps {
   savedOutfits: OutfitSuggestion[];
   onSaveOutfit: (outfit: OutfitSuggestion) => void;
   onDeleteOutfit: (idx: number) => void;
+  currentCapsule?: string;
+  onCapsuleChange?: (capsule: string) => void;
 }
 
-export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, onDeleteOutfit }: OutfitBuilderProps) {
+export default function OutfitBuilder({ 
+  wardrobe, 
+  savedOutfits, 
+  onSaveOutfit, 
+  onDeleteOutfit,
+  currentCapsule = "all_actual",
+  onCapsuleChange
+}: OutfitBuilderProps) {
   const [objective, setObjective] = useState("Create comfortable, durable but chic active layering for Kids Day.");
+  const [selectedCapsule, setSelectedCapsule] = useState<string>(currentCapsule);
+
+  useEffect(() => {
+    if (currentCapsule) {
+      setSelectedCapsule(currentCapsule);
+    }
+  }, [currentCapsule]);
+
+  const handleLocalCapsuleChange = (capsule: string) => {
+    setSelectedCapsule(capsule);
+    if (onCapsuleChange) {
+      onCapsuleChange(capsule);
+    }
+  };
+
+  const filteredWardrobe = wardrobe.filter(item => {
+    // Capsule matching filter
+    const matchesCapsule = selectedCapsule === "all_actual"
+      ? item.season !== "Dream AW"
+      : item.season === selectedCapsule;
+      
+    if (!matchesCapsule) return false;
+
+    // Filter wishlisted items is strictly requested:
+    // If chosen capsule is Dream AW (future roadmap), show both existing & wishlist.
+    // Otherwise, only owned/existing items.
+    if (selectedCapsule !== "Dream AW" && item.status !== "existing") {
+      return false;
+    }
+    
+    return true;
+  });
   const [loading, setLoading] = useState(false);
   const [aiOutfits, setAiOutfits] = useState<OutfitSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -182,8 +223,8 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
 
   // Trigger server-side Gemini 3.5 AI styling planner
   const generateAiOutfits = async (customPrompt?: string) => {
-    if (wardrobe.length === 0) {
-      setError("Add some clothing items to your wardrobe first so the AI Capsule Director can design looks!");
+    if (filteredWardrobe.length === 0) {
+      setError(`Your filtered wardrobe has 0 items. Add or switch your active capsule to one containing pieces so the AI Capsule Director can pair them!`);
       return;
     }
 
@@ -194,7 +235,7 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
     try {
       const finalObjective = customPrompt || `${objective} (Targeting: ${selectedActivity})`;
       // Strip potentially bulky base64 image data before transmission to backend
-      const sanitizedItems = wardrobe.map(({ imageUrl, ...rest }) => rest);
+      const sanitizedItems = filteredWardrobe.map(({ imageUrl, ...rest }) => rest);
       
       const response = await fetch("/api/gemini/suggest-outfits", {
         method: "POST",
@@ -304,7 +345,7 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
 
   return (
     <div className="space-y-8" id="outfit-builder-module">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-brand-border pb-5">
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 border-b border-brand-border pb-5">
         <div>
           <h2 className="font-serif font-medium text-brand-charcoal text-2xl tracking-tight">
             Style Capsule Planner & Director
@@ -314,13 +355,35 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+          {/* Capsule Dropdown Picker */}
+          <div className="flex items-center gap-2.5 bg-brand-greige/30 border border-brand-border/60 px-4 py-2 rounded-[32px]">
+            <span className="text-[10px] uppercase font-bold text-brand-sage tracking-wider font-sans whitespace-nowrap">Selected Capsule:</span>
+            <div className="relative">
+              <select
+                value={selectedCapsule}
+                onChange={(e) => handleLocalCapsuleChange(e.target.value)}
+                className="appearance-none bg-white border border-brand-border text-brand-charcoal font-semibold text-xs py-1.5 pl-3 pr-8 rounded-[24px] focus:outline-none focus:ring-1 focus:ring-brand-olive cursor-pointer"
+              >
+                <option value="all_actual">✨ All Actual Pieces</option>
+                <option value="Summer 25-26">☀️ Summer 25-26</option>
+                <option value="Autumn 26">🍁 Autumn 26</option>
+                <option value="Winter 26">❄️ Winter 26</option>
+                <option value="Handbag Inventory">💼 Handbag Inventory</option>
+                <option value="Dream AW">⭐️ Dream AW Future</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-brand-sage">
+                <ChevronDown className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={() => {
               setManualMode(!manualMode);
               setAiOutfits([]);
             }}
-            className={`px-5 py-2 text-xs font-semibold rounded-[32px] tracking-wider uppercase border transition-all cursor-pointer ${
+            className={`px-5 py-2.5 text-xs font-semibold rounded-[32px] tracking-wider uppercase border transition-all cursor-pointer ${
               manualMode
                 ? "bg-brand-charcoal text-white border-brand-charcoal"
                 : "bg-white text-brand-charcoal border-brand-border hover:bg-brand-greige/50"
@@ -491,8 +554,9 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
           <AnimatePresence>
             {aiOutfits.length > 0 && !loading && (
               <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 30, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 350, damping: 25, mass: 0.8 }}
                 className="space-y-6 pt-5 border-t border-dashed border-brand-border"
               >
                 <div className="flex items-center justify-between">
@@ -506,10 +570,11 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                     const isReportingThis = reportingOutfitIdx === index;
                     return (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0, y: 25, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ type: "spring", stiffness: 380, damping: 26, delay: index * 0.05 }}
                         key={index}
-                        className="bg-white rounded-[24px] border border-brand-border p-6 shadow-xs flex flex-col lg:flex-row justify-between gap-6 hover:shadow-sm transition-shadow relative overflow-hidden"
+                        className="bg-white rounded-[24px] border border-brand-border p-6 shadow-xs flex flex-col lg:flex-row justify-between gap-6 hover:shadow-md transition-all duration-200 relative overflow-visible"
                       >
                         {/* Tiny Card Index Number Display */}
                         <div className="absolute top-0 left-0 bg-brand-olive text-white px-3 py-1 text-[10px] font-mono font-bold rounded-br-2xl select-none shadow-3xs">
@@ -526,7 +591,7 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                                 <Calendar className="w-3.5 h-3.5 text-brand-sage" /> {outfit.occasion}
                               </span>
                             </div>
-                            <h5 className="font-serif font-semibold text-brand-charcoal text-lg mt-1 font-semibold">
+                            <h5 className="font-serif font-semibold text-brand-charcoal text-lg mt-1">
                               {outfit.name}
                             </h5>
                             <p className="text-brand-sage text-xs italic leading-relaxed">
@@ -613,37 +678,58 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                           )}
                         </div>
 
-                        {/* Outfits horizontal strip displaying mini vector garments (Auto-numbered 1, 2, 3) */}
-                        <div className="w-full lg:w-[350px] flex items-center justify-center gap-2 bg-brand-greige/35 rounded-2xl p-4 border border-brand-border self-center">
+                        {/* Responsive, wrapped layout that never stretches out of boundaries */}
+                        <div className="w-full lg:w-auto max-w-full flex flex-wrap items-center justify-center gap-2 bg-brand-greige/35 rounded-2xl p-4 border border-brand-border self-center md:pb-5">
                           {outfit.items.map((garment, gIdx) => (
                             <div
                               key={gIdx}
-                              className="flex-1 text-center bg-white border border-brand-border p-2.5 rounded-xl flex flex-col items-center justify-between h-40 relative group shadow-2xs"
+                              className="w-[82px] shrink-0 text-center bg-white border border-brand-border p-2 rounded-xl flex flex-col items-center justify-between h-36 relative group shadow-2xs hover:border-brand-olive hover:shadow-xs transition-all duration-200"
                             >
                               {/* Item Rank inside Outfit Suggester */}
-                              <span className="absolute bottom-1.5 right-2.5 font-mono text-xs text-[#A6705D] select-none font-bold">
+                              <span className="absolute bottom-1 right-2 font-mono text-[10px] text-stone-500 select-none font-bold">
                                 #{gIdx + 1}
                               </span>
                               
                               <span
-                                className={`absolute top-1.5 left-1.5 w-2 h-2 rounded-full ${
+                                className={`absolute top-1 left-1.5 w-2 h-2 rounded-full border border-white shadow-3xs ${
                                   garment.status === "buy" ? "bg-[#A6705D]" : "bg-[#4A674A]"
-                               }`}
+                                }`}
                                 title={garment.status === "buy" ? "Wishlist buy item suggestion" : "Closet owned item"}
                               />
                               {/* Graphic core */}
-                              <div className="w-12 h-18 flex items-center justify-center">
+                              <div className="w-10 h-14 flex items-center justify-center">
                                 <ApparelSilhouette category={garment.aiSuggestedCategory || "Tops"} hexColor={garment.hex} />
                               </div>
                               {/* Info */}
-                              <div className="w-full pt-1.5 border-t border-dashed border-stone-100">
-                                <p className="text-[9.5px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5">
+                              <div className="w-full pt-1 border-t border-dashed border-stone-100">
+                                <p className="text-[9px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5">
                                   {garment.item}
                                 </p>
-                                <p className="text-[8px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none">
+                                <p className="text-[7.5px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none">
                                   {garment.brand || "Unbranded"}
                                 </p>
                               </div>
+
+                              {/* Gorgeous Hover detail popover card! */}
+                              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 bg-white/95 border border-brand-border rounded-xl p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-40 flex flex-col justify-between text-left shadow-md">
+                                <div className="space-y-1 overflow-hidden">
+                                  <div className="flex items-center gap-1.5 justify-between">
+                                    <span className="font-sans text-[8px] uppercase tracking-wider font-bold bg-brand-greige px-1.5 py-0.5 rounded-sm line-clamp-1">{garment.aiSuggestedCategory || "Tops"}</span>
+                                    <span className={`w-2 h-2 rounded-full ${garment.status === "buy" ? "bg-[#A6705D]" : "bg-[#4A674A]"}`} />
+                                  </div>
+                                  <h5 className="font-serif font-bold text-brand-charcoal text-[11.5px] leading-tight capitalize truncate">{garment.item}</h5>
+                                  <p className="text-[10px] text-brand-sage font-medium uppercase font-sans tracking-wide leading-none">{garment.brand || "Unbranded"}</p>
+                                  <p className="text-[9.5px] text-stone-600 font-semibold truncate leading-none capitalize mt-1">Col: {garment.color}</p>
+                                  {garment.description && (
+                                    <p className="text-[9px] text-stone-500 italic leading-snug line-clamp-2 pt-0.5 border-t border-stone-100/50">"{garment.description}"</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between text-[8px] font-mono text-stone-400 border-t border-dashed border-stone-100 pt-1 mt-1">
+                                  <span className="truncate max-w-[90px]">{garment.season}</span>
+                                  <span className="uppercase text-[7.5px] font-bold text-[#4A674A]">{garment.status === "buy" ? "Wishlist" : "Owned"}</span>
+                                </div>
+                              </div>
+
                             </div>
                           ))}
                         </div>
@@ -795,36 +881,53 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                 </span>
                 
                 <div className="bg-white border border-brand-border rounded-xl max-h-56 overflow-y-auto p-2.5 space-y-1.5 scrollbar-thin">
-                  {wardrobe.map((garment, idx) => {
-                    const isSelected = selectedItemIds.includes(garment.id);
-                    return (
-                      <button
-                        key={garment.id}
-                        onClick={() => toggleManualItemSelection(garment.id)}
-                        className={`w-full text-left p-2.5 rounded-lg text-xs flex items-center justify-between border transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-brand-olive text-white border-brand-olive font-semibold shadow-xs"
-                            : "bg-[#FAF9F6] hover:bg-brand-greige/40 text-brand-charcoal border-brand-border/60"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`font-mono text-xs w-5 shrink-0 font-bold select-none text-center ${isSelected ? "text-stone-200" : "text-stone-500"}`}>
-                            {(idx + 1).toString().padStart(2, "0")}
+                  {filteredWardrobe.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-brand-sage italic">
+                      No items in this capsule. Try selecting a different active capsule.
+                    </div>
+                  ) : (
+                    filteredWardrobe.map((garment, idx) => {
+                      const isSelected = selectedItemIds.includes(garment.id);
+                      return (
+                        <button
+                          key={garment.id}
+                          onClick={() => toggleManualItemSelection(garment.id)}
+                          className={`w-full text-left p-2.5 rounded-lg text-xs flex items-center justify-between border transition-all cursor-pointer relative group ${
+                            isSelected
+                              ? "bg-brand-olive text-white border-brand-olive font-semibold shadow-xs"
+                              : "bg-[#FAF9F6] hover:bg-brand-greige/40 text-brand-charcoal border-brand-border/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`font-mono text-xs w-5 shrink-0 font-bold select-none text-center ${isSelected ? "text-stone-200" : "text-stone-500"}`}>
+                              {(idx + 1).toString().padStart(2, "0")}
+                            </span>
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-white shadow-xs block"
+                              style={{ backgroundColor: garment.hex }}
+                            />
+                            <span className="capitalize">{garment.brand || "Unbranded"} — {garment.item} ({garment.color})</span>
+                          </div>
+                          <span className={`text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
+                            isSelected ? "bg-white/20 text-white" : "bg-brand-greige text-brand-sage"
+                          }`}>
+                            {garment.status === "buy" ? "Wishlist" : "Closet"}
                           </span>
-                          <span
-                            className="w-2.5 h-2.5 rounded-full border border-white shadow-xs block"
-                            style={{ backgroundColor: garment.hex }}
-                          />
-                          <span className="capitalize">{garment.brand} - {garment.item} ({garment.color})</span>
-                        </div>
-                        <span className={`text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
-                          isSelected ? "bg-white/20 text-white" : "bg-brand-greige text-brand-sage"
-                        }`}>
-                          {garment.status === "buy" ? "Wishlist" : "Closet"}
-                        </span>
-                      </button>
-                    );
-                  })}
+
+                          {/* Detail tooltip on hover */}
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-white text-brand-charcoal border border-brand-border rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 flex flex-col justify-between text-left shadow-md">
+                            <span className="font-sans text-[7.5px] uppercase tracking-wider font-bold bg-brand-greige px-1.5 py-0.5 rounded-sm w-fit mb-1">{garment.aiSuggestedCategory || "Tops"}</span>
+                            <h6 className="font-serif font-bold text-[11px] leading-tight capitalize truncate mb-0.5">{garment.item}</h6>
+                            <p className="text-[9px] text-stone-500 italic truncate leading-none mb-1">"{garment.description || "No description"}"</p>
+                            <div className="text-[8px] text-stone-400 font-mono flex justify-between border-t border-stone-100 pt-1">
+                              <span>Season: {garment.season}</span>
+                              <span className="uppercase text-[#4A674A]">{garment.status === "buy" ? "Wishlist" : "Owned"}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -897,14 +1000,14 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                 </div>
 
                 {/* Displaying horizontal mini wardrobe cards within Pinned Portfolio Set */}
-                <div className="w-full md:w-80 flex items-center justify-start gap-1.5 bg-brand-greige/30 rounded-xl p-2.5 border border-brand-border self-center">
+                <div className="w-full md:w-auto max-w-full flex flex-wrap items-center justify-start gap-1.5 bg-brand-greige/30 rounded-xl p-2.5 border border-brand-border self-center md:pb-3.5">
                   {outfit.items.map((garment, gIdx) => (
                     <div
                       key={gIdx}
-                      className="flex-1 text-center bg-white border border-brand-border p-2 rounded-lg flex flex-col items-center justify-between h-32 relative shadow-2xs"
+                      className="w-[80px] shrink-0 text-center bg-white border border-brand-border p-2 rounded-lg flex flex-col items-center justify-between h-32 relative group shadow-2xs hover:border-brand-olive hover:shadow-xs transition-all duration-200"
                     >
                       {/* Auto item index */}
-                      <span className="absolute bottom-1.5 right-2 font-mono text-xs text-stone-500 select-none font-bold">
+                      <span className="absolute bottom-1 right-2 font-mono text-[9px] text-stone-500 select-none font-bold">
                         #{gIdx + 1}
                       </span>
                       
@@ -915,10 +1018,31 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                         <p className="text-[9px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5">
                           {garment.item}
                         </p>
-                        <p className="text-[8px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none">
+                        <p className="text-[7.5px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none">
                           {garment.brand || "Unbranded"}
                         </p>
                       </div>
+
+                      {/* Detail hover popup tooltip */}
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-48 bg-white/95 border border-brand-border rounded-xl p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-40 flex flex-col justify-between text-left shadow-md">
+                        <div className="space-y-1 overflow-hidden">
+                          <div className="flex items-center gap-1.5 justify-between">
+                            <span className="font-sans text-[7.5px] uppercase tracking-wider font-bold bg-brand-greige px-1.5 py-0.5 rounded-sm line-clamp-1">{garment.aiSuggestedCategory || "Tops"}</span>
+                            <span className={`w-2 h-2 rounded-full ${garment.status === "buy" ? "bg-[#A6705D]" : "bg-[#4A674A]"}`} />
+                          </div>
+                          <h5 className="font-serif font-bold text-brand-charcoal text-[11px] leading-tight capitalize truncate">{garment.item}</h5>
+                          <p className="text-[9.5px] text-brand-sage font-medium uppercase font-sans tracking-wide leading-none">{garment.brand || "Unbranded"}</p>
+                          <p className="text-[9px] text-stone-600 font-semibold truncate leading-none capitalize mt-1">Col: {garment.color}</p>
+                          {garment.description && (
+                            <p className="text-[8.5px] text-stone-500 italic leading-snug line-clamp-2 pt-0.5 border-t border-[#FAF9F6]">"{garment.description}"</p>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-[7.5px] font-mono text-stone-400 border-t border-dashed border-stone-100 pt-1 mt-1">
+                          <span className="truncate max-w-[90px]">{garment.season}</span>
+                          <span className="uppercase text-[7.5px] font-bold text-[#4A674A]">{garment.status === "buy" ? "Wishlist" : "Owned"}</span>
+                        </div>
+                      </div>
+
                     </div>
                   ))}
                 </div>

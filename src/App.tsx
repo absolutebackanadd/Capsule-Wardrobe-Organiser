@@ -1601,6 +1601,8 @@ export default function App() {
                 savedOutfits={savedOutfits}
                 onSaveOutfit={(o) => setSavedOutfits(prev => [o, ...prev])}
                 onDeleteOutfit={(idx) => setSavedOutfits(prev => prev.filter((_, i) => i !== idx))}
+                currentCapsule={activeSeason}
+                onCapsuleChange={setActiveSeason}
               />
             </motion.div>
           )}
