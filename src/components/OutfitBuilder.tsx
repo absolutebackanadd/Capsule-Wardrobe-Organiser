@@ -72,7 +72,16 @@ export default function OutfitBuilder({
     }
     
     return true;
-  });
+  }).reduce<WardrobeItem[]>((acc, item) => {
+    if (selectedCapsule === "all_actual" && item.masterId) {
+      if (!acc.some(i => i.masterId === item.masterId)) {
+        acc.push(item);
+      }
+    } else {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
   const [loading, setLoading] = useState(false);
   const [aiOutfits, setAiOutfits] = useState<OutfitSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -734,13 +743,13 @@ export default function OutfitBuilder({
                           {outfit.items.map((garment, gIdx) => (
                             <motion.div
                               key={gIdx}
-                              initial={{ x: -250, y: -40, opacity: 0, rotate: -25, scale: 0.5 }}
+                              initial={{ x: -350, y: -60, opacity: 0, rotate: -35, scale: 0.4 }}
                               animate={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 1 }}
                               transition={{ 
                                 type: "spring", 
-                                stiffness: 180, 
-                                damping: 16, 
-                                delay: gIdx * 0.12 + 0.1 
+                                stiffness: 220, 
+                                damping: 20, 
+                                delay: (index * outfit.items.length + gIdx) * 0.05 + 0.1 
                               }}
                               className="w-[82px] shrink-0 text-center bg-white border border-brand-border p-2 rounded-xl flex flex-col items-center justify-between h-36 relative group shadow-2xs hover:border-brand-olive hover:shadow-xs transition-all duration-200"
                             >

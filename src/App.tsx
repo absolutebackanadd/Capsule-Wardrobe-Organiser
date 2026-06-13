@@ -41,6 +41,51 @@ export default function App() {
   const [activeSeasonTab, setActiveSeasonTab] = useState<"actual" | "future">("actual");
   const [activeSeason, setActiveSeason] = useState<string>("all_actual");
   const [isStyleSummaryExpanded, setIsStyleSummaryExpanded] = useState(true);
+  const [dynamicDescriptions, setDynamicDescriptions] = useState<Record<string, string>>({});
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+
+  // Automatically generate dynamic capsule description when season changes
+  useEffect(() => {
+    if (wardrobe.length === 0) return;
+    
+    const seasonId = activeSeason === "all_actual" ? "All Closets" : activeSeason;
+    if (dynamicDescriptions[seasonId]) return;
+
+    const generateDesc = async () => {
+      setIsGeneratingDesc(true);
+      try {
+        const itemsToAnalyze = wardrobe.filter(item => {
+          if (activeSeasonTab === "actual") {
+            return activeSeason === "all_actual" ? (item.season !== "Dream AW") : (item.season === activeSeason);
+          } else {
+            return item.season === "Dream AW";
+          }
+        });
+        
+        // Strip out base64 images
+        const sanitized = itemsToAnalyze.map(({ imageUrl, ...rest }) => rest);
+        
+        const res = await fetch("/api/gemini/summarize-capsule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: sanitized, season: seasonId })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.capsuleDescription) {
+            setDynamicDescriptions(prev => ({ ...prev, [seasonId]: data.capsuleDescription }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to generate dynamic description:", err);
+      } finally {
+        setIsGeneratingDesc(false);
+      }
+    };
+    
+    generateDesc();
+  }, [activeSeason, wardrobe, activeSeasonTab, dynamicDescriptions]);
 
   // Load default season
   useEffect(() => {
@@ -808,7 +853,16 @@ export default function App() {
     }
 
     return matchesSearch && matchesCategory && matchesStatus && matchesBrand && matchesColor && matchesSeason;
-  });
+  }).reduce<WardrobeItem[]>((acc, item) => {
+    if (activeSeasonTab === "actual" && activeSeason === "all_actual" && item.masterId) {
+      if (!acc.some(i => i.masterId === item.masterId)) {
+        acc.push(item);
+      }
+    } else {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
 
   return (
     <div className="min-h-screen bg-brand-alabaster text-brand-charcoal font-sans flex flex-col antialiased selection:bg-brand-brown selection:text-white">
@@ -987,7 +1041,7 @@ export default function App() {
 
               {/* Collapsible Style Summary Guide with Free Text Descriptions */}
               {(() => {
-                const configId = activeSeasonTab === "future" ? "Dream AW" : (activeSeason === "all_actual" ? "Summer 25-26" : activeSeason);
+                const configId = activeSeasonTab === "future" ? "Dream AW" : activeSeason;
                 const activeSeasonConfig = SEASONS_CONFIG.find(sc => sc.id === configId);
                 if (!activeSeasonConfig) return null;
 
@@ -1021,9 +1075,15 @@ export default function App() {
 
                     {isStyleSummaryExpanded && (
                       <div className="pt-2.5 border-t border-brand-border/60 space-y-4.5 animate-fade-in">
-                        <p className="text-brand-charcoal/90 text-xs italic leading-relaxed bg-white p-4 rounded-xl border border-brand-border/40 select-all">
-                          {activeSeasonConfig.description}
-                        </p>
+                        <div className="text-brand-charcoal/90 text-xs italic leading-relaxed bg-white p-4 rounded-xl border border-brand-border/40 select-all relative">
+                          {isGeneratingDesc && !dynamicDescriptions[activeSeason === "all_actual" ? "All Closets" : activeSeason] ? (
+                            <div className="flex items-center gap-2 text-brand-sage animate-pulse">
+                              <Sparkles className="w-3.5 h-3.5" /> Generatively summarizing your items...
+                            </div>
+                          ) : (
+                            <p>{dynamicDescriptions[activeSeason === "all_actual" ? "All Closets" : activeSeason] || activeSeasonConfig.description}</p>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
                           {activeSeasonConfig.principles.map((pr, idx) => (
                             <div key={idx} className="bg-white p-4 rounded-xl border border-brand-border/45 space-y-1.5 hover:shadow-2xs transition-shadow">

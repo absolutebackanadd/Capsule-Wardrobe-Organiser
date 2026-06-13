@@ -12,6 +12,27 @@ export interface SeasonConfig {
 // Full-text aesthetic descriptions of her seasons as outlined in her spreadsheet tabs
 export const SEASONS_CONFIG: SeasonConfig[] = [
   {
+    id: "all_actual",
+    name: "All Collections",
+    type: "actual",
+    description: "Welcome to your entire overarching wardrobe. This is a comprehensive high-level view of all active clothing items you currently own across every capsule.",
+    summaryTitle: "\u26f0\ufe0f Total Wardrobe Synthesis",
+    principles: [
+      {
+        title: "Holistic Overview",
+        desc: "Ensure pieces can cross-pollinate between seasons where possible to maximize the lifetime value of garments."
+      },
+      {
+        title: "Trans-seasonal Styling",
+        desc: "Identify items like basic tees or light outer-layers that can bridge the gaps between Summer and Autumn effortlessly."
+      },
+      {
+        title: "Identify Redundancies",
+        desc: "A wide view helps spot exact duplicates or colors that dominate your overall aesthetic too heavily."
+      }
+    ]
+  },
+  {
     id: "Summer 25-26",
     name: "Summer 25-26",
     type: "actual",

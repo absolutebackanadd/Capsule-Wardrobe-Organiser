@@ -147,6 +147,8 @@ app.post("/api/gemini/suggest-outfits", async (req, res) => {
 I have a list of clothes in my closet (marked "existing") and some on my wish list (marked "buy"). 
 Based on these items, generate 3 highly cohesive, elegant outfit capsules. 
 
+Stipulate a highly randomized selection approach: Pick items you haven't recently put together! Give me entirely fresh, wildly varied outfit ideas for today (Entropy Seed: ${Date.now()}).
+
 STRICT LEARNED RULES & FEEDBACK CONSTRAINTS:
 You MUST follow the user corrections and styling suitability memories below. If a correction states that an item, color, brand, or style is unsuitable for a specific activity (e.g., kids active days, errand days, church) or shouldn't go together, you MUST STRICTLY obey that negative constraint and do NOT make that mistake again:
 ${stylingMemories || "No rules registered yet."}
@@ -161,6 +163,7 @@ Return exactly 3 outfit suggestions as a JSON array.`;
       model: "gemini-3.5-flash",
       contents: JSON.stringify(miniItems) + "\n\n" + prompt,
       config: {
+        temperature: 0.9,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
