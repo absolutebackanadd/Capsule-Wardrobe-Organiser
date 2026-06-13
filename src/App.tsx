@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { WardrobeItem, OutfitSuggestion } from "./types";
 import { initialCuratedWardrobe, exportToCSVString, SEASONS_CONFIG } from "./data";
-import WardrobeCard from "./components/WardrobeCard";
+import WardrobeCard, { ApparelSilhouette } from "./components/WardrobeCard";
 import OutfitBuilder from "./components/OutfitBuilder";
 import AnalyticsPanel from "./components/AnalyticsPanel";
 import ExcelImporter from "./components/ExcelImporter";
@@ -26,6 +26,7 @@ import {
   Upload,
   Link,
   Globe,
+  Eye,
   Image as ImageIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -47,6 +48,32 @@ export default function App() {
   const [brandFilter, setBrandFilter] = useState("all");
   const [colorFilter, setColorFilter] = useState("all");
   const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
+
+  // Layout View Mode & Compactness Sliders
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
+  const [compactness, setCompactness] = useState<number>(3); // 1-5 line compact padding
+  const [zoomLevel, setZoomLevel] = useState<number>(100);  // 75% - 150% sizing scale
+
+  // AI Summary & Content Enrichment (Keywords & style descriptions)
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [capsuleSummaryKeywords, setCapsuleSummaryKeywords] = useState<string[]>([]);
+  const [capsuleDescription, setCapsuleDescription] = useState<string>("");
+  const [suggestedEnrichments, setSuggestedEnrichments] = useState<{ id: string; originalNotes: string; suggestedNotesAppend: string; item: string }[]>([]);
+  const [enrichmentApplied, setEnrichmentApplied] = useState(false);
+  const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
+
+  // Wardrobe Gaps state
+  const [isAnalyzingGaps, setIsAnalyzingGaps] = useState(false);
+  const [gapsAssessment, setGapsAssessment] = useState<string>("");
+  const [gapsRecommendations, setGapsRecommendations] = useState<{ item: string; category: string; color: string; reason: string }[]>([]);
+  const [gapsError, setGapsError] = useState<string | null>(null);
+
+  // Category Condensing & Reassignments
+  const [isCondensing, setIsCondensing] = useState(false);
+  const [condenseMapping, setCondenseMapping] = useState<Record<string, string> | null>(null);
+  const [condenseError, setCondenseError] = useState<string | null>(null);
+  const [condenseSuccess, setCondenseSuccess] = useState<string | null>(null);
+  const [isAmendingOpen, setIsAmendingOpen] = useState(false);
 
   // Forms / Modals
   const [showAddForm, setShowAddForm] = useState(false);
@@ -429,6 +456,226 @@ export default function App() {
     setIsDetailEditing(false);
   };
 
+  // AI Capsule Summary & Notes Enrichment
+  const handleEnrichCapsule = async () => {
+    try {
+      setIsSummarizing(true);
+      setEnrichmentError(null);
+      setEnrichmentApplied(false);
+      
+      const itemsToAnalyze = wardrobe.filter(item => {
+        if (activeSeasonTab === "actual") {
+          return activeSeason === "all_actual" ? (item.season !== "Dream AW") : (item.season === activeSeason);
+        } else {
+          return item.season === "Dream AW";
+        }
+      });
+
+      if (itemsToAnalyze.length === 0) {
+        setEnrichmentError("Please add or import some garments to this season capsule first!");
+        setIsSummarizing(false);
+        return;
+      }
+
+      const res = await fetch("/api/gemini/summarize-capsule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: itemsToAnalyze,
+          season: activeSeason === "all_actual" ? "All Closets" : activeSeason
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("Capsule Summary enrichment request failed");
+      }
+
+      const data = await res.json();
+      setCapsuleSummaryKeywords(data.capsuleSummaryKeywords || []);
+      setCapsuleDescription(data.capsuleDescription || "");
+      
+      const enriched = (data.notesEnrichment || []).map((ne: any) => {
+        const itemObj = wardrobe.find(w => w.id === ne.id);
+        return {
+          id: ne.id,
+          originalNotes: itemObj?.notes || "",
+          suggestedNotesAppend: ne.suggestedNotesAppend,
+          item: itemObj?.item || "Apparel item"
+        };
+      }).filter((e: any) => e.suggestedNotesAppend);
+
+      setSuggestedEnrichments(enriched);
+    } catch (err: any) {
+      console.error(err);
+      setEnrichmentError("Unable to compile AI capsule overview at this moment. Check your API settings.");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  // Apply note updates to existing wardrobe garments
+  const handleApplyEnrichment = () => {
+    if (suggestedEnrichments.length === 0) return;
+    setWardrobe(prev => prev.map(item => {
+      const enrichment = suggestedEnrichments.find(e => e.id === item.id);
+      if (enrichment && enrichment.suggestedNotesAppend) {
+        const append = enrichment.suggestedNotesAppend;
+        const current = item.notes ? item.notes.trim() : "";
+        if (current.toLowerCase().includes(append.toLowerCase())) {
+          return item;
+        }
+        const updatedNotes = current ? `${current}. ${append}` : append;
+        return { ...item, notes: updatedNotes };
+      }
+      return item;
+    }));
+    setEnrichmentApplied(true);
+    setSuggestedEnrichments([]);
+  };
+
+  // Evaluate structural wardrobe holes
+  const handleAnalyzeGaps = async () => {
+    try {
+      setIsAnalyzingGaps(true);
+      setGapsError(null);
+      const itemsToAnalyze = wardrobe.filter(item => {
+        if (activeSeasonTab === "actual") {
+          return activeSeason === "all_actual" ? (item.season !== "Dream AW") : (item.season === activeSeason);
+        } else {
+          return item.season === "Dream AW";
+        }
+      });
+
+      if (itemsToAnalyze.length === 0) {
+        setGapsError("Please populate clothing items inside this active season to detect gaps.");
+        setIsAnalyzingGaps(false);
+        return;
+      }
+
+      const res = await fetch("/api/gemini/analyze-gaps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: itemsToAnalyze,
+          season: activeSeason === "all_actual" ? "All Closets" : activeSeason
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("Gaps analysis endpoint returned error code");
+      }
+
+      const data = await res.json();
+      setGapsAssessment(data.generalGapAssessment || "");
+      setGapsRecommendations(data.suggestedItemsToBuy || []);
+    } catch (err: any) {
+      console.error(err);
+      setGapsError("Could not run gap analyzer. Check API keys in settings.");
+    } finally {
+      setIsAnalyzingGaps(false);
+    }
+  };
+
+  // Add a recommended item directly into wardrobe
+  const handleAddRecommendItem = async (rec: { item: string; category: string; color: string; reason: string }) => {
+    const fallbackSeason = activeSeason === "all_actual" ? "Summer 25-26" : activeSeason;
+    const added: WardrobeItem = {
+      id: `gap-recommend-${Date.now()}`,
+      item: rec.item,
+      color: rec.color,
+      hex: "#78716c", // Neutral slate base
+      description: rec.reason,
+      brand: "Suggested Add",
+      notes: `Suggested gap filler. ${rec.reason}`,
+      status: "buy", // Always goes to wishlist/buy!
+      season: fallbackSeason,
+      aiSuggestedCategory: rec.category || "Tops",
+      aiStyleTags: ["Suggested", "Gap Filler", activeSeason],
+      aiStylingAdvice: "This item was recommended by Gemini styling analytics to boost looks versatility!"
+    };
+
+    setWardrobe(prev => [added, ...prev]);
+    // Clear recommendation from view list
+    setGapsRecommendations(prev => prev.filter(r => r.item !== rec.item));
+
+    // Refine details using our standard detail lookup in background
+    try {
+      const response = await fetch("/api/gemini/analyze-item", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item: added.item,
+          color: added.color,
+          description: added.description,
+          brand: added.brand,
+          notes: added.notes
+        })
+      });
+      if (response.ok) {
+        const enriched = await response.json();
+        setWardrobe(prev => prev.map(item => item.id === added.id ? {
+          ...item,
+          hex: enriched.hex || item.hex,
+          aiSuggestedCategory: enriched.aiSuggestedCategory || item.aiSuggestedCategory,
+          aiStyleTags: enriched.aiStyleTags || item.aiStyleTags,
+          aiStylingAdvice: enriched.aiStylingAdvice || item.aiStylingAdvice
+        } : item));
+      }
+    } catch (e) {
+      console.warn("Background enrichment for gap selection item failed", e);
+    }
+  };
+
+  // Automate grouping and metadata cleanup
+  const handleCondenseCategories = async () => {
+    try {
+      setIsCondensing(true);
+      setCondenseError(null);
+      setCondenseSuccess(null);
+
+      // Extract raw categories parsed in wardrobe
+      const currentCats = Array.from(new Set(wardrobe.map(item => item.aiSuggestedCategory || "Tops"))).filter(Boolean);
+      if (currentCats.length === 0) {
+        setCondenseError("Your digital closet is empty. Add or import items first.");
+        setIsCondensing(false);
+        return;
+      }
+
+      const res = await fetch("/api/gemini/condense-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: currentCats })
+      });
+
+      if (!res.ok) {
+        throw new Error("Category standardizer endpoint failed");
+      }
+
+      const data = await res.json();
+      setCondenseMapping(data.categoryMapping || null);
+    } catch (err: any) {
+      console.error(err);
+      setCondenseError("Failed to condense categories list. Verify API service keys in settings.");
+    } finally {
+      setIsCondensing(false);
+    }
+  };
+
+  // Apply categories standardized mappings
+  const handleApplyCondensation = () => {
+    if (!condenseMapping) return;
+    setWardrobe(prev => prev.map(item => {
+      const current = item.aiSuggestedCategory || "Tops";
+      const standard = condenseMapping[current];
+      if (standard) {
+        return { ...item, aiSuggestedCategory: standard };
+      }
+      return item;
+    }));
+    setCondenseSuccess("Beautifully condensed and standardized category labels! Your wardrobe is organized cleanly.");
+    setCondenseMapping(null);
+  };
+
   // Filter calculations
   const uniqueBrands = Array.from(new Set(wardrobe.map(w => w.brand || "Unbranded"))).filter(Boolean);
   const uniqueColors = Array.from(new Set(wardrobe.map(w => w.color))).filter(Boolean);
@@ -698,6 +945,315 @@ export default function App() {
                 );
               })()}
 
+              {/* Gemini Wardrobe Studio Card Dashboard */}
+              <div className="bg-white border border-brand-border/80 rounded-[24px] p-6 shadow-[0_6px_24px_rgba(0,0,0,0.015)] space-y-6">
+                <div className="flex items-center justify-between flex-wrap gap-4 border-b border-brand-border/40 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#E8F0E8]/50 border border-brand-olive/20 rounded-xl flex items-center justify-center text-brand-olive shadow-2xs">
+                      <Sparkles className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif italic font-semibold text-brand-charcoal text-lg">
+                        Gemini Wardrobe Studio
+                      </h3>
+                      <p className="text-[#4A674A] text-[9px] uppercase tracking-widest font-sans font-bold">
+                        🧠 COGNITIVE CAPSULE INTELLIGENCE
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-brand-sage bg-brand-greige/40 px-3 py-1.5 rounded-full font-mono">
+                    Active: {activeSeason === "all_actual" ? "All Actual Collections" : activeSeason}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <button
+                    onClick={handleEnrichCapsule}
+                    disabled={isSummarizing}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 bg-[#FAF9F6] border border-brand-border/80 hover:bg-brand-greige/40 rounded-xl text-xs font-semibold text-brand-charcoal transition-all cursor-pointer shadow-3xs"
+                  >
+                    {isSummarizing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Generating Summary...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-brand-olive" />
+                        ✨ Style Summary & Notes
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleAnalyzeGaps}
+                    disabled={isAnalyzingGaps}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 bg-[#FAF9F6] border border-brand-border/80 hover:bg-brand-greige/40 rounded-xl text-xs font-semibold text-brand-charcoal transition-all cursor-pointer shadow-3xs"
+                  >
+                    {isAnalyzingGaps ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Scanning Wardrobe...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-3.5 h-3.5 text-[#A6705D]" />
+                        🔍 Scan Wardrobe Gaps
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleCondenseCategories}
+                    disabled={isCondensing}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 bg-[#FAF9F6] border border-brand-border/80 hover:bg-brand-greige/40 rounded-xl text-xs font-semibold text-brand-charcoal transition-all cursor-pointer shadow-3xs"
+                  >
+                    {isCondensing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 text-brand-sage" />
+                        📁 Condense Excel Categories
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsAmendingOpen(!isAmendingOpen);
+                      setCondenseSuccess(null);
+                    }}
+                    className={`flex items-center justify-center gap-2 px-5 py-3.5 border rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-3xs ${
+                      isAmendingOpen
+                        ? "bg-[#E8F0E8] border-brand-olive text-brand-olive"
+                        : "bg-[#FAF9F6] border-brand-border/80 hover:bg-brand-greige/40 text-brand-charcoal"
+                    }`}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    ✏️ Manual Amendments Desk
+                  </button>
+                </div>
+
+                {/* Gemini Style Summary & note appender output */}
+                {capsuleDescription && (
+                  <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
+                    <div className="space-y-1">
+                      <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
+                        🎯 Style Summary & Keyword Aesthetics
+                      </h4>
+                      <div className="flex flex-wrap gap-2 pt-1 border-b border-brand-border/40 pb-3.5">
+                        {capsuleSummaryKeywords.map((kw, i) => (
+                          <span key={i} className="px-3 py-1 bg-white border border-brand-border text-[11px] font-sans font-semibold text-stone-600 rounded-full shadow-3xs">
+                            🌱 {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-brand-charcoal text-xs italic leading-relaxed select-all">
+                      "{capsuleDescription}"
+                    </p>
+
+                    {suggestedEnrichments.length > 0 && (
+                      <div className="bg-white p-4.5 rounded-xl border border-brand-border/45 space-y-3.5">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                          <div>
+                            <h5 className="text-[11px] font-bold text-stone-700 uppercase">Suggested Note Enrichments ({suggestedEnrichments.length})</h5>
+                            <p className="text-[10px] text-brand-sage leading-tight">These keyword additions build beautifully on the existing notes from your spreadsheet.</p>
+                          </div>
+                          {!enrichmentApplied ? (
+                            <button
+                              onClick={handleApplyEnrichment}
+                              className="px-4 py-1.5 bg-brand-olive hover:bg-[#484833] text-white text-[10px] uppercase font-bold tracking-wider rounded-full transition-all cursor-pointer shadow-3xs"
+                            >
+                              📝 Apply to All Note Fields
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-bold text-[#4A674A] bg-[#E8F0E8] px-3 py-1 rounded-full uppercase">
+                              ✓ Enrichments Applied!
+                            </span>
+                          )}
+                        </div>
+
+                        {!enrichmentApplied && (
+                          <div className="max-h-[140px] overflow-y-auto divide-y divide-brand-border/40 pr-1 text-xs">
+                            {suggestedEnrichments.slice(0, 5).map((e, idx) => (
+                              <div key={idx} className="py-2 flex items-center justify-between gap-4">
+                                <span className="font-semibold text-brand-charcoal capitalize">{e.item}</span>
+                                <span className="text-brand-sage font-mono bg-stone-50 px-2 py-0.5 border border-stone-200/50 rounded-sm text-[10px]">
+                                  + "{e.suggestedNotesAppend}"
+                                </span>
+                              </div>
+                            ))}
+                            {suggestedEnrichments.length > 5 && (
+                              <div className="text-right text-[9px] text-brand-sage pt-2">
+                                ...and {suggestedEnrichments.length - 5} more items.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {enrichmentError && (
+                  <p className="text-xs text-red-650 bg-red-50 p-3 rounded-lg border border-red-200/50">
+                    ⚠️ {enrichmentError}
+                  </p>
+                )}
+
+                {/* Wardrobe Gaps recommendations output */}
+                {gapsAssessment && (
+                  <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
+                    <div>
+                      <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
+                        ⚖️ Wardrobe Balance & Gap Assessment
+                      </h4>
+                      <p className="text-brand-charcoal text-xs leading-relaxed italic mt-1 bg-white p-3.5 border border-brand-border/40 rounded-xl">
+                        "{gapsAssessment}"
+                      </p>
+                    </div>
+
+                    {gapsRecommendations.length > 0 && (
+                      <div className="space-y-2.5">
+                        <label className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Recommended Additions to Buy list</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                          {gapsRecommendations.map((rec, i) => (
+                            <div key={i} className="bg-white border border-brand-border/60 p-4 rounded-xl flex flex-col justify-between hover:shadow-2xs transition-shadow">
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[9px] bg-brand-greige border border-stone-200/50 px-2 py-0.5 rounded-full text-stone-600 font-bold uppercase tracking-wider">
+                                    {rec.category}
+                                  </span>
+                                  <span className="w-2.5 h-2.5 rounded-full border border-stone-200" style={{ backgroundColor: rec.color === "Charcoal Grey" ? "#4b5563" : (rec.color === "Oatmeal Beige" ? "#f5f5f4" : "#1e293b") }} />
+                                </div>
+                                <h5 className="font-serif font-bold text-brand-charcoal text-xs">{rec.item} <span className="font-sans font-normal text-[11px] text-brand-sage">in {rec.color}</span></h5>
+                                <p className="text-brand-sage text-[10.5px] leading-tight italic">{rec.reason}</p>
+                              </div>
+                              <button
+                                onClick={() => handleAddRecommendItem(rec)}
+                                className="w-full mt-3.5 py-2 bg-stone-900 text-stone-50 hover:bg-stone-800 text-[9px] uppercase tracking-widest font-bold rounded-lg transition-all cursor-pointer"
+                              >
+                                + Add to Wishlist
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {gapsError && (
+                  <p className="text-xs text-red-650 bg-red-50 p-3 rounded-lg border border-red-200/50">
+                    ⚠️ {gapsError}
+                  </p>
+                )}
+
+                {/* Category Condenser layout confirm mappings */}
+                {condenseMapping && (
+                  <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
+                    <div>
+                      <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
+                        📁 AI Spreadsheet Clean Map Output
+                      </h4>
+                      <p className="text-[10.5px] text-brand-sage mt-0.5">Gemini will group these non-standard labels into neat apparel folders:</p>
+                    </div>
+
+                    <div className="max-h-[160px] overflow-y-auto bg-white border border-brand-border p-3.5 rounded-xl divide-y divide-stone-100 pr-1">
+                      {Object.entries(condenseMapping).map(([orig, standard]) => (
+                        <div key={orig} className="py-2.5 flex items-center justify-between text-xs">
+                          <span className="text-stone-500 line-through capitalize font-medium">{orig}</span>
+                          <span className="text-[10px] font-mono font-bold bg-[#FAF9F6] border border-stone-200 px-1.5 py-0.5 rounded-sm">➔</span>
+                          <span className="text-brand-olive font-bold uppercase tracking-wider">{standard}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setCondenseMapping(null)}
+                        className="px-4 py-2 bg-white border border-brand-border rounded-lg text-xs text-brand-sage font-semibold hover:bg-brand-greige/30 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleApplyCondensation}
+                        className="px-5 py-2 bg-brand-olive text-white rounded-lg text-xs font-semibold hover:bg-[#484833] cursor-pointer shadow-3xs"
+                      >
+                        Confirm AI Standardization
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {condenseError && (
+                  <p className="text-xs text-red-650 bg-red-50 p-3 rounded-lg border border-red-200/50">
+                    ⚠️ {condenseError}
+                  </p>
+                )}
+
+                {condenseSuccess && (
+                  <p className="text-xs text-[#4A674A] bg-[#E8F0E8] p-3.5 rounded-lg border border-brand-olive/20">
+                    🌿 {condenseSuccess}
+                  </p>
+                )}
+
+                {/* Manual Amendment Desk */}
+                {isAmendingOpen && (
+                  <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
+                    <div>
+                      <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive flex items-center gap-1.5">
+                        ✏️ Wardrobe Category Amendment Desk
+                      </h4>
+                      <p className="text-[10.5px] text-brand-sage">Double check and amend any miscategorized groupings right here.</p>
+                    </div>
+
+                    <div className="max-h-[300px] overflow-y-auto bg-white border border-brand-border rounded-xl divide-y divide-stone-100 pr-1">
+                      {wardrobe
+                        .filter(item => {
+                          if (activeSeasonTab === "actual") {
+                            return activeSeason === "all_actual" ? (item.season !== "Dream AW") : (item.season === activeSeason);
+                          } else {
+                            return item.season === "Dream AW";
+                          }
+                        })
+                        .map((item, idx) => (
+                          <div key={item.id} className="p-3 flex items-center justify-between gap-4 text-xs">
+                            <div className="flex items-center gap-2.5 truncate">
+                              <span className="font-mono text-[9px] text-brand-sage bg-brand-greige border border-stone-250/20 px-1 py-0.5 rounded-sm">0{idx + 1}</span>
+                              <div className="truncate">
+                                <p className="font-semibold text-brand-charcoal capitalize truncate leading-tight">{item.item}</p>
+                                <p className="text-[9.5px] text-brand-sage font-medium uppercase font-sans tracking-wide leading-none mt-0.5">{item.brand || "Unbranded"}</p>
+                              </div>
+                            </div>
+
+                            <select
+                              value={item.aiSuggestedCategory || "Tops"}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setWardrobe(prev => prev.map(w => w.id === item.id ? { ...w, aiSuggestedCategory: val } : w));
+                              }}
+                              className="bg-stone-50 border border-brand-border text-xs px-2.5 py-1.5 rounded-lg outline-none text-brand-charcoal cursor-pointer focus:ring-1 focus:ring-brand-olive"
+                            >
+                              <option value="Tops">Tops</option>
+                              <option value="Bottoms">Bottoms</option>
+                              <option value="Outerwear">Outerwear</option>
+                              <option value="Dresses">Dresses</option>
+                              <option value="Shoes">Shoes</option>
+                              <option value="Accessories">Accessories</option>
+                            </select>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Dynamic Filter Controls Bar in Greige box */}
               <div className="bg-brand-greige/45 border border-brand-border p-5 rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-4">
                 <div className="flex flex-col md:flex-row gap-3">
@@ -719,15 +1275,12 @@ export default function App() {
                       <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[125px] focus:ring-1 focus:ring-brand-olive"
+                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-[32px] focus:outline-none cursor-pointer appearance-none pr-8 min-w-[125px] focus:ring-1 focus:ring-brand-olive text-left"
                       >
                         <option value="all">All Apparel</option>
-                        <option value="tops">Tops</option>
-                        <option value="bottoms">Bottoms</option>
-                        <option value="outerwear">Outerwear</option>
-                        <option value="dresses">Dresses</option>
-                        <option value="shoes">Shoes</option>
-                        <option value="accessories">Accessories</option>
+                        {Array.from(new Set(wardrobe.map(w => w.aiSuggestedCategory || "Tops"))).filter((cat): cat is string => !!cat).map(cat => (
+                          <option key={cat} value={cat.toLowerCase()}>{cat}</option>
+                        ))}
                       </select>
                       <SlidersHorizontal className="w-3.5 h-3.5 text-brand-sage/80 pointer-events-none absolute right-3.5 top-3.5" />
                     </div>
@@ -781,9 +1334,70 @@ export default function App() {
                     )}
                   </div>
                 </div>
+
+                {/* View Mode Switcher, Compactness Slider & Zoom Level Slider Row */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-brand-border/40">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] uppercase font-bold text-brand-sage tracking-wider">Layout View:</span>
+                    <div className="flex bg-white/80 p-0.5 rounded-full border border-brand-border">
+                      <button
+                        onClick={() => setViewMode("card")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-semibold transition-all cursor-pointer ${
+                          viewMode === "card"
+                            ? "bg-brand-olive text-white shadow-xs"
+                            : "text-brand-sage hover:text-brand-charcoal"
+                        }`}
+                      >
+                        <Grid className="w-3 h-3" /> Cards
+                      </button>
+                      <button
+                        onClick={() => setViewMode("list")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-semibold transition-all cursor-pointer ${
+                          viewMode === "list"
+                            ? "bg-brand-olive text-white shadow-xs"
+                            : "text-brand-sage hover:text-brand-charcoal"
+                        }`}
+                      >
+                        <Grid className="w-3 h-3" /> List
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6 flex-wrap">
+                    {/* Compactness controls only make sense in list mode */}
+                    {viewMode === "list" && (
+                      <div className="flex items-center gap-2 min-w-[150px]">
+                        <span className="text-[10px] uppercase font-bold text-brand-sage tracking-wider shrink-0">Compactness:</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          value={compactness}
+                          onChange={(e) => setCompactness(Number(e.target.value))}
+                          className="w-full accent-brand-olive cursor-pointer h-1 bg-brand-border rounded-lg appearance-none"
+                        />
+                        <span className="text-[10px] font-mono text-brand-charcoal">{compactness}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 min-w-[150px]">
+                      <span className="text-[10px] uppercase font-bold text-brand-sage tracking-wider shrink-0">Scale Size:</span>
+                      <input
+                        type="range"
+                        min="75"
+                        max="150"
+                        step="5"
+                        value={zoomLevel}
+                        onChange={(e) => setZoomLevel(Number(e.target.value))}
+                        className="w-full accent-brand-olive cursor-pointer h-1 bg-brand-border rounded-lg appearance-none"
+                      />
+                      <span className="text-[10px] font-mono text-brand-charcoal">{zoomLevel}%</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Grid garments List */}
+              {/* Grid or List garments List */}
               {filteredItems.length === 0 ? (
                 <div className="border border-stone-200 border-dashed rounded-2xl p-16 text-center bg-white">
                   <Grid className="w-10 h-10 text-stone-300 mx-auto mb-4" />
@@ -812,19 +1426,155 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              ) : viewMode === "card" ? (
+                <div 
+                  className="grid gap-6 transition-all"
+                  style={{
+                    gridTemplateColumns: `repeat(auto-fill, minmax(${265 * (zoomLevel / 100)}px, 1fr))`
+                  }}
+                >
                   <AnimatePresence>
                     {filteredItems.map(item => (
-                      <WardrobeCard
-                        key={item.id}
-                        item={item}
-                        onSelect={setSelectedItem}
-                        onDelete={handleDeleteItem}
-                        onToggleStatus={handleToggleStatus}
-                      />
+                      <div 
+                        key={item.id} 
+                        style={{ fontSize: `${zoomLevel}%` }}
+                        className="transition-all"
+                      >
+                        <WardrobeCard
+                          item={item}
+                          onSelect={setSelectedItem}
+                          onDelete={handleDeleteItem}
+                          onToggleStatus={handleToggleStatus}
+                        />
+                      </div>
                     ))}
                   </AnimatePresence>
+                </div>
+              ) : (
+                <div className="bg-white border border-brand-border rounded-[20px] overflow-hidden shadow-xs animate-fade-in overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                      <tr className="bg-brand-greige/30 border-b border-brand-border/60 text-brand-sage uppercase text-[10px] font-bold tracking-wider select-none">
+                        <th className="px-5 py-3">Photo</th>
+                        <th className="px-5 py-3">Item Name</th>
+                        <th className="px-5 py-3">Category</th>
+                        <th className="px-5 py-3">Brand</th>
+                        <th className="px-5 py-3">Color</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Season</th>
+                        <th className="px-5 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <AnimatePresence>
+                        {filteredItems.map((item, idx) => {
+                          const isExisting = item.status === "existing";
+                          const paddingStyle = compactness === 1 ? "py-1" : 
+                                               compactness === 2 ? "py-2" :
+                                               compactness === 3 ? "py-3" :
+                                               compactness === 4 ? "py-4.5" : "py-6";
+                          
+                          return (
+                            <motion.tr
+                              key={item.id}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              onClick={() => setSelectedItem(item)}
+                              className="border-b border-brand-border/40 hover:bg-brand-greige/10 transition-colors cursor-pointer"
+                              style={{ fontSize: `${zoomLevel}%` }}
+                            >
+                              {/* Photo / Silhouette */}
+                              <td className={`px-5 ${paddingStyle}`}>
+                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border bg-[#F2EFE9]/30 flex items-center justify-center shrink-0">
+                                  {item.imageUrl ? (
+                                    <img src={item.imageUrl} alt={item.item} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <div className="w-5 h-5 flex items-center justify-center">
+                                      <ApparelSilhouette category={item.aiSuggestedCategory || "Tops"} hexColor={item.hex} />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Item Name */}
+                              <td className={`px-5 ${paddingStyle} font-serif font-semibold text-brand-charcoal text-sm`}>
+                                <div className="flex flex-col">
+                                  <span className="capitalize">{item.item}</span>
+                                  {item.notes && (
+                                    <span className="text-[10px] text-brand-sage/80 italic font-normal line-clamp-1">{item.notes}</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Category */}
+                              <td className={`px-5 ${paddingStyle} text-xs text-brand-charcoal/80 font-medium`}>
+                                <span className="bg-brand-greige border border-brand-border/40 px-2.5 py-1 rounded-full text-[10px] font-semibold text-brand-sage uppercase">
+                                  {item.aiSuggestedCategory || "Tops"}
+                                </span>
+                              </td>
+
+                              {/* Brand */}
+                              <td className={`px-5 ${paddingStyle} text-xs text-brand-sage font-semibold font-sans`}>
+                                {item.brand || "—"}
+                              </td>
+
+                              {/* Color */}
+                              <td className={`px-5 ${paddingStyle} text-xs text-brand-charcoal`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="w-3.5 h-3.5 rounded-full border border-stone-200" style={{ backgroundColor: item.hex }} />
+                                  <span className="capitalize">{item.color}</span>
+                                </div>
+                              </td>
+
+                              {/* Status */}
+                              <td className={`px-5 ${paddingStyle} text-xs`} onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleStatus(item.id);
+                                  }}
+                                  className={`px-3 py-1 rounded-[20px] text-[9px] font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                                    isExisting
+                                      ? "bg-[#E8F0E8] text-[#4A674A] border-transparent"
+                                      : "bg-[#F8EEE8] text-[#A6705D] border-transparent"
+                                  }`}
+                                >
+                                  {isExisting ? "Existing" : "Wishlist"}
+                                </button>
+                              </td>
+
+                              {/* Season */}
+                              <td className={`px-5 ${paddingStyle} text-xs text-brand-olive font-semibold font-sans`}>
+                                {item.season}
+                              </td>
+
+                              {/* Actions */}
+                              <td className={`px-5 ${paddingStyle} text-right`} onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => setSelectedItem(item)}
+                                    className="p-1.5 text-brand-sage hover:text-brand-charcoal hover:bg-brand-greige/50 rounded-md transition-all cursor-pointer"
+                                    title="View details"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteItem(item.id)}
+                                    className="p-1.5 text-brand-sage hover:text-red-650 hover:bg-brand-greige/50 rounded-md transition-all cursor-pointer"
+                                    title="Delete item"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+
+                            </motion.tr>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
                 </div>
               )}
             </motion.div>

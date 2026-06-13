@@ -406,6 +406,234 @@ app.post("/api/scrape-image", async (req, res) => {
 });
 
 
+// Endpoint 6: Analyze active capsule collection, suggest keywords & notes append
+app.post("/api/gemini/summarize-capsule", async (req, res) => {
+  try {
+    const { items, season } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "No items provided for analysis" });
+    }
+
+    const client = getGeminiClient();
+
+    const liteItems = items.map(item => ({
+      id: item.id,
+      item: item.item,
+      color: item.color,
+      brand: item.brand,
+      description: item.description,
+      notes: item.notes,
+      category: item.aiSuggestedCategory || "Tops"
+    }));
+
+    const prompt = `You are a professional closet stylist and capsule wardrobe architecture designer.
+We have selected a custom wardrobe subset representing the season "${season || "Active Season"}".
+
+Here are the capsule items:
+${JSON.stringify(liteItems, null, 2)}
+
+Please analyze this active capsule collection and return:
+1. Two to four sleek style Keywords (max 3 words each, e.g. "Nelson Corduroys", "Rich Earthy Layers", "Jewel Pops", "Minimalist Tailoring") representing the capsule's visual DNA.
+2. A beautiful, coherent style summary/description (2-3 sentences max) outlining how these pieces interact together.
+3. A short elegant note enrichment append suggestion (1-5 words max, e.g. "superb corduroy layering", "adds sharp contrast note", "unifies neutral blazers") for each garment based on its design, color, and brand. This must append cleanly onto their existing spreadsheet notes.
+
+Return exactly this JSON response format:
+{
+  "capsuleSummaryKeywords": ["Keyword 1", "Keyword 2", "Keyword 3"],
+  "capsuleDescription": "A narrative summarizing the architectural cohesion, key layering options, and overall aesthetic vibe.",
+  "notesEnrichment": [
+    {
+      "id": "exact_item_id_here",
+      "suggestedNotesAppend": "elegant contrast element"
+    }
+  ]
+}`;
+
+    const response = await client.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            capsuleSummaryKeywords: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "2 to 4 keywords summarizing the visual DNA of this season's clothing items"
+            },
+            capsuleDescription: {
+              type: Type.STRING,
+              description: "Professional, beautiful summary of the wardrobe's color palette, outerwear weight, and versatility."
+            },
+            notesEnrichment: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING, description: "The exact ID of the wardrobe item." },
+                  suggestedNotesAppend: { type: Type.STRING, description: "Short stylistic phrase to append to the item notes (e.g. 'anchors bright outerwear' or 'chic slouchy layering'). Max 5 words." }
+                },
+                required: ["id", "suggestedNotesAppend"]
+              }
+            }
+          },
+          required: ["capsuleSummaryKeywords", "capsuleDescription", "notesEnrichment"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    res.json(parsed);
+  } catch (error: any) {
+    console.error("Error summarizing capsule with Gemini:", error);
+    res.status(500).json({ error: "Failed to compile style summary", details: error.message });
+  }
+});
+
+
+// Endpoint 7: Analyze wardrobe structure and locate missing garment gaps
+app.post("/api/gemini/analyze-gaps", async (req, res) => {
+  try {
+    const { items, season } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "No clothing items found to check for gaps." });
+    }
+
+    const client = getGeminiClient();
+    const liteItems = items.map(item => ({
+      item: item.item,
+      color: item.color,
+      category: item.aiSuggestedCategory || "Tops",
+      status: item.status
+    }));
+
+    const prompt = `You are a master wardrobe architecture analyst. We have a capsule collection for season "${season || "Active Season"}".
+We want to evaluate its composition (tops vs bottoms, outerwear, footwear ratio) and identify what key gaps exist that would drastically improve style efficiency.
+
+Here is the current item list:
+${JSON.stringify(liteItems, null, 2)}
+
+Analyze this collection:
+1. Provide a general gap assessment (2 sentences maximum) pointing out what is missing or unbalanced (e.g. "Lacking structured ankle footwear for heavy rain", "Solid outerwear is abundant, but you need soft inner thermal base tops to avoid cold New Zealand winds").
+2. Standardize three explicit high-value additions to fill these gaps. For each item recommend: the name, the standard category (must be one of: Tops, Bottoms, Outerwear, Dresses, Shoes, Accessories), a versatile color, and a brilliant style justification.
+
+Return exactly this JSON response format:
+{
+  "generalGapAssessment": "Your concise 2-sentence review.",
+  "suggestedItemsToBuy": [
+    {
+      "item": "Merino Wool Crewneck",
+      "category": "Tops",
+      "color": "Charcoal Grey",
+      "reason": "Provides thin, high-heat insulating layeys underneath corduroy jacket shells without bulk."
+    }
+  ]
+}`;
+
+    const response = await client.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            generalGapAssessment: {
+              type: Type.STRING,
+              description: "Short, highly tailored review of what's missing or how to boost wardrobe versatility."
+            },
+            suggestedItemsToBuy: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  item: { type: Type.STRING, description: "Name of recommended item to buy (e.g. Chunky Knit Sweater)" },
+                  category: { type: Type.STRING, description: "Must be exactly one of: Tops, Bottoms, Outerwear, Dresses, Shoes, Accessories" },
+                  color: { type: Type.STRING, description: "Recommended versatile color to unify existing items (e.g. Oatmeal Beige)" },
+                  reason: { type: Type.STRING, description: "Editorial brief explanation of why this unblocks more outfit permutations." }
+                },
+                required: ["item", "category", "color", "reason"]
+              },
+              description: "Exactly 3 targeted wardrobe ideas to purchase."
+            }
+          },
+          required: ["generalGapAssessment", "suggestedItemsToBuy"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    res.json(parsed);
+  } catch (error: any) {
+    console.error("Error evaluating wardrobe gaps:", error);
+    res.status(500).json({ error: "Failed to evaluate gaps", details: error.message });
+  }
+});
+
+
+// Endpoint 8: Standardize non-standard spreadsheet categories into 6 core definitions
+app.post("/api/gemini/condense-categories", async (req, res) => {
+  try {
+    const { categories } = req.body;
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+      return res.status(400).json({ error: "No category names input for condensation" });
+    }
+
+    const client = getGeminiClient();
+
+    const prompt = `You are an AI data cleaning assistant.
+We have a set of user-generated wardrobe category titles imported from custom spreadsheet tabs:
+${JSON.stringify(categories, null, 2)}
+
+Please map each unique category/title to exactly one of our 6 standard elegant categories:
+- "Tops"
+- "Bottoms"
+- "Outerwear"
+- "Dresses"
+- "Shoes"
+- "Accessories"
+
+Return a key-value mapping object where the keys are the original labels and the values are their mapped standardized counterparts.
+
+Return exactly this JSON response format:
+{
+  "categoryMapping": {
+    "pant": "Bottoms",
+    "boot": "Shoes",
+    "chelsea boots": "Shoes",
+    "silk t-shirt": "Tops",
+    "shacket": "Outerwear"
+  }
+}`;
+
+    const response = await client.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            categoryMapping: {
+              type: Type.OBJECT,
+              description: "A dictionary mapping original messy category strings to standard neat ones from our list."
+            }
+          },
+          required: ["categoryMapping"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    res.json(parsed);
+  } catch (error: any) {
+    console.error("Error condensing categories with Gemini:", error);
+    res.status(500).json({ error: "Failed to map standard categories", details: error.message });
+  }
+});
+
+
 // -------------------------------------------------------------------------
 // VITE OR STATIC SERVING MIDDLEWARE
 // -------------------------------------------------------------------------
