@@ -7,6 +7,7 @@ export interface WardrobeItem {
   brand: string;
   notes: string;
   status: 'existing' | 'buy'; // Existing or Buy
+  season?: string;       // e.g. 'Summer 25-26', 'Autumn 26', 'Winter 26', 'Handbag Inventory', 'Dream AW'
   aiStyleTags?: string[];
   aiStylingAdvice?: string;
   aiSuggestedCategory?: string; // Standardized wardrobe category

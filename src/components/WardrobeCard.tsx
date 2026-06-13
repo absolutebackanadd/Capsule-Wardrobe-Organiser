@@ -174,9 +174,19 @@ export default function WardrobeCard({ item, onSelect, onDelete, onToggleStatus 
       {/* Card Content Footer labels */}
       <div className="p-5 flex flex-col gap-2 cursor-pointer flex-1 justify-between" onClick={() => onSelect(item)}>
         <div className="space-y-1">
-          <p className="text-[10px] uppercase font-bold tracking-wider text-brand-sage font-sans">
-            {item.brand || "Unbranded"}
-          </p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-brand-sage font-sans">
+              {item.brand || "Unbranded"}
+            </p>
+            {item.season && (
+              <>
+                <span className="text-[8px] text-brand-sage/60">•</span>
+                <span className="text-[9px] font-sans font-semibold text-brand-olive uppercase tracking-wider">
+                  {item.season.replace(" capsule 2026", " '26").replace(" capsule 2025 - 26", " '25-26")}
+                </span>
+              </>
+            )}
+          </div>
           <h3 className="font-serif font-semibold text-brand-charcoal text-[17px] tracking-tight capitalize truncate leading-tight">
             {item.item}
           </h3>

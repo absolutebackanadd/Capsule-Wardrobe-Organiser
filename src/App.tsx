@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { WardrobeItem, OutfitSuggestion } from "./types";
-import { initialCuratedWardrobe, exportToCSVString } from "./data";
+import { initialCuratedWardrobe, exportToCSVString, SEASONS_CONFIG } from "./data";
 import WardrobeCard from "./components/WardrobeCard";
 import OutfitBuilder from "./components/OutfitBuilder";
 import AnalyticsPanel from "./components/AnalyticsPanel";
@@ -31,6 +31,11 @@ export default function App() {
   const [savedOutfits, setSavedOutfits] = useState<OutfitSuggestion[]>([]);
   const [activeTab, setActiveTab] = useState<"closet" | "planner" | "insights" | "dataset">("closet");
   
+  // Seasons and planning state filter
+  const [activeSeasonTab, setActiveSeasonTab] = useState<"actual" | "future">("actual");
+  const [activeSeason, setActiveSeason] = useState<string>("all_actual");
+  const [isStyleSummaryExpanded, setIsStyleSummaryExpanded] = useState(true);
+
   // Selection and search states
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -51,6 +56,7 @@ export default function App() {
     brand: "",
     notes: "",
     status: "existing" as "existing" | "buy",
+    season: "Summer 25-26",
     aiSuggestedCategory: "Tops"
   });
   const [aiAutofillQuery, setAiAutofillQuery] = useState("");
@@ -270,6 +276,7 @@ export default function App() {
       brand: trimmedBrand,
       notes: trimmedNotes,
       status: newItem.status,
+      season: newItem.season,
       aiSuggestedCategory: newItem.aiSuggestedCategory,
       hex: guessHexColor(trimmedColor),
       aiStyleTags: ["Bespoke"],
@@ -310,6 +317,7 @@ export default function App() {
         brand: "",
         notes: "",
         status: "existing",
+        season: "Summer 25-26",
         aiSuggestedCategory: "Tops"
       });
       setFormSuccess(null);
@@ -421,7 +429,20 @@ export default function App() {
       colorFilter === "all" ||
       item.color.toLowerCase() === colorFilter.toLowerCase();
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesBrand && matchesColor;
+    let matchesSeason = true;
+    if (activeSeasonTab === "actual") {
+      if (activeSeason === "all_actual") {
+        // All actual closets (exclude Dream AW planning)
+        matchesSeason = !item.season || item.season !== "Dream AW";
+      } else {
+        matchesSeason = item.season === activeSeason;
+      }
+    } else {
+      // Future planned capsule is Dream AW
+      matchesSeason = item.season === "Dream AW";
+    }
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesBrand && matchesColor && matchesSeason;
   });
 
   return (
@@ -502,6 +523,148 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
+              {/* Season Selection & Planning Hub */}
+              <div className="bg-white border border-brand-border rounded-[24px] p-5.5 shadow-[0_4px_20px_rgba(0,0,0,0.015)] space-y-4">
+                {/* Segmented Top Control (Actual vs Future) */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-border/60 pb-3">
+                  <div className="flex bg-brand-greige/60 p-1.5 rounded-full border border-brand-border/40">
+                    <button
+                      onClick={() => {
+                        setActiveSeasonTab("actual");
+                        setActiveSeason("all_actual");
+                      }}
+                      className={`py-2 px-5 text-xs uppercase tracking-wider font-semibold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        activeSeasonTab === "actual"
+                          ? "bg-brand-olive text-white shadow-xs"
+                          : "text-brand-sage hover:text-brand-charcoal"
+                      }`}
+                    >
+                      📅 Actual Closet Collections
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveSeasonTab("future");
+                        setActiveSeason("Dream AW");
+                      }}
+                      className={`py-2 px-5 text-xs uppercase tracking-wider font-semibold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        activeSeasonTab === "future"
+                          ? "bg-brand-olive text-white shadow-xs"
+                          : "text-brand-sage hover:text-brand-charcoal"
+                      }`}
+                    >
+                      ⭐️ Future Planning
+                    </button>
+                  </div>
+
+                  <span className="text-[10px] uppercase font-bold text-brand-sage tracking-widest font-sans px-2.5">
+                    {activeSeasonTab === "actual" ? "✨ Viewing Owned Wardrobes" : "🎯 Planning & Wishlist Spec"}
+                  </span>
+                </div>
+
+                {/* Sub-pills for Actual Wardrobes */}
+                {activeSeasonTab === "actual" && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {[
+                      { id: "all_actual", label: "✨ All Actual Pieces" },
+                      { id: "Summer 25-26", label: "☀️ Summer 25-26" },
+                      { id: "Autumn 26", label: "🍁 Autumn 26" },
+                      { id: "Winter 26", label: "❄️ Winter 26" },
+                      { id: "Handbag Inventory", label: "💼 Handbag Inventory" }
+                    ].map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setActiveSeason(sub.id)}
+                        className={`px-4.5 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                          activeSeason === sub.id
+                            ? "bg-brand-olive text-white shadow-sm"
+                            : "bg-[#FAF9F6] border border-brand-border/70 text-brand-sage hover:text-brand-charcoal hover:border-brand-sage"
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Sub-pills for Future Wardrobes */}
+                {activeSeasonTab === "future" && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {[
+                      { id: "Dream AW", label: "⭐️ Dream AW Future Capsule" }
+                    ].map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setActiveSeason(sub.id)}
+                        className={`px-4.5 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                          activeSeason === sub.id
+                            ? "bg-brand-olive text-white shadow-sm"
+                            : "bg-[#FAF9F6] border border-brand-border/70 text-brand-sage hover:text-brand-charcoal hover:border-brand-sage"
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Collapsible Style Summary Guide with Free Text Descriptions */}
+              {(() => {
+                const configId = activeSeasonTab === "future" ? "Dream AW" : (activeSeason === "all_actual" ? "Summer 25-26" : activeSeason);
+                const activeSeasonConfig = SEASONS_CONFIG.find(sc => sc.id === configId);
+                if (!activeSeasonConfig) return null;
+
+                return (
+                  <div className="bg-brand-greige/25 border border-brand-border rounded-[24px] p-6 space-y-4 shadow-3xs">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-white border border-brand-border/60 rounded-xl flex items-center justify-center text-lg shadow-3xs">
+                          {activeSeasonConfig.id === "Summer 25-26" && "☀️"}
+                          {activeSeasonConfig.id === "Autumn 26" && "🍁"}
+                          {activeSeasonConfig.id === "Winter 26" && "❄️"}
+                          {activeSeasonConfig.id === "Handbag Inventory" && "💼"}
+                          {activeSeasonConfig.id === "Dream AW" && "⭐️"}
+                        </div>
+                        <div>
+                          <h3 className="font-serif italic font-medium text-brand-charcoal text-base">
+                            {activeSeasonConfig.id === "Handbag Inventory" ? "Handbag Setup & Ratings Guide" : activeSeasonConfig.summaryTitle}
+                          </h3>
+                          <p className="text-brand-sage text-[10px] uppercase tracking-wider font-sans font-bold">
+                            {activeSeasonTab === "future" ? "📅 future Roadmap & planning rules" : "🌿 capsule functional guideline"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsStyleSummaryExpanded(!isStyleSummaryExpanded)}
+                        className="px-4 py-2 bg-white hover:bg-brand-greige/50 border border-brand-border/60 rounded-full text-[10px] uppercase tracking-widest font-semibold text-brand-charcoal transition-all cursor-pointer shadow-3xs"
+                      >
+                        {isStyleSummaryExpanded ? "Hide Description ▲" : "Reveal Look Principles ▼"}
+                      </button>
+                    </div>
+
+                    {isStyleSummaryExpanded && (
+                      <div className="pt-2.5 border-t border-brand-border/60 space-y-4.5 animate-fade-in">
+                        <p className="text-brand-charcoal/90 text-xs italic leading-relaxed bg-white p-4 rounded-xl border border-brand-border/40 select-all">
+                          {activeSeasonConfig.description}
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
+                          {activeSeasonConfig.principles.map((pr, idx) => (
+                            <div key={idx} className="bg-white p-4 rounded-xl border border-brand-border/45 space-y-1.5 hover:shadow-2xs transition-shadow">
+                              <span className="text-[10px] uppercase font-bold text-brand-olive tracking-wider flex items-center gap-1.5">
+                                <span className="font-mono text-brand-sage bg-brand-greige/50 px-1.5 py-0.5 rounded-sm">0{idx + 1}</span> {pr.title}
+                              </span>
+                              <p className="text-brand-sage text-[11px] leading-relaxed select-all">
+                                {pr.desc}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Dynamic Filter Controls Bar in Greige box */}
               <div className="bg-brand-greige/45 border border-brand-border p-5 rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-4">
                 <div className="flex flex-col md:flex-row gap-3">
@@ -943,6 +1106,21 @@ export default function App() {
                       />
                     </div>
 
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Garment Season / Capsule</label>
+                      <select
+                        value={selectedItem.season || "Summer 25-26"}
+                        onChange={(e) => setSelectedItem({ ...selectedItem, season: e.target.value })}
+                        className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
+                      >
+                        <option value="Summer 25-26">☀️ Summer capsule 2025 - 26</option>
+                        <option value="Autumn 26">🍁 Autumn 26</option>
+                        <option value="Winter 26">❄️ Winter capsule 2026</option>
+                        <option value="Handbag Inventory">💼 Handbag Inventory</option>
+                        <option value="Dream AW">⭐️ Dream AW (Future Planning)</option>
+                      </select>
+                    </div>
+
                     <div className="flex items-center gap-2">
                       <label className="text-xs font-semibold text-stone-700">Existing Closet status:</label>
                       <button
@@ -1178,6 +1356,21 @@ export default function App() {
                     rows={2}
                     className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none resize-none"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Target Season / Capsule Tab</label>
+                  <select
+                    value={newItem.season}
+                    onChange={(e) => setNewItem({ ...newItem, season: e.target.value })}
+                    className="w-full bg-white border border-stone-200 text-stone-850 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                  >
+                    <option value="Summer 25-26">☀️ Summer capsule 2025 - 26</option>
+                    <option value="Autumn 26">🍁 Autumn 26</option>
+                    <option value="Winter 26">❄️ Winter capsule 2026</option>
+                    <option value="Handbag Inventory">💼 Handbag Inventory</option>
+                    <option value="Dream AW">⭐️ Dream AW (Future Planning)</option>
+                  </select>
                 </div>
 
                 <div className="flex gap-2 pt-2">
