@@ -193,11 +193,13 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
 
     try {
       const finalObjective = customPrompt || `${objective} (Targeting: ${selectedActivity})`;
+      // Strip potentially bulky base64 image data before transmission to backend
+      const sanitizedItems = wardrobe.map(({ imageUrl, ...rest }) => rest);
       
       const response = await fetch("/api/gemini/suggest-outfits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: wardrobe, objective: finalObjective }),
+        body: JSON.stringify({ items: sanitizedItems, objective: finalObjective }),
       });
 
       if (!response.ok) {

@@ -477,11 +477,13 @@ export default function App() {
         return;
       }
 
+      const sanitizedItems = itemsToAnalyze.map(({ imageUrl, ...rest }) => rest);
+
       const res = await fetch("/api/gemini/summarize-capsule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: itemsToAnalyze,
+          items: sanitizedItems,
           season: activeSeason === "all_actual" ? "All Closets" : activeSeason
         })
       });
@@ -552,11 +554,13 @@ export default function App() {
         return;
       }
 
+      const sanitizedItemsForGaps = itemsToAnalyze.map(({ imageUrl, ...rest }) => rest);
+
       const res = await fetch("/api/gemini/analyze-gaps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: itemsToAnalyze,
+          items: sanitizedItemsForGaps,
           season: activeSeason === "all_actual" ? "All Closets" : activeSeason
         })
       });
