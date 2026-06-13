@@ -1229,7 +1229,7 @@ export default function App() {
                         .map((item, idx) => (
                           <div key={item.id} className="p-3 flex items-center justify-between gap-4 text-xs">
                             <div className="flex items-center gap-2.5 truncate">
-                              <span className="font-mono text-[9px] text-brand-sage bg-brand-greige border border-stone-250/20 px-1 py-0.5 rounded-sm">0{idx + 1}</span>
+                              <span className="font-mono text-xs text-brand-charcoal font-bold bg-brand-greige border border-stone-250/20 px-2 py-0.5 rounded-md">{(idx + 1).toString().padStart(2, '0')}</span>
                               <div className="truncate">
                                 <p className="font-semibold text-brand-charcoal capitalize truncate leading-tight">{item.item}</p>
                                 <p className="text-[9.5px] text-brand-sage font-medium uppercase font-sans tracking-wide leading-none mt-0.5">{item.brand || "Unbranded"}</p>
@@ -1492,7 +1492,7 @@ export default function App() {
                               {/* Photo / Silhouette */}
                               <td className={`px-5 ${paddingStyle}`}>
                                 <div className="flex items-center gap-2.5">
-                                  <span className="font-mono text-[10px] text-stone-400 font-semibold w-5 shrink-0 select-none">
+                                  <span className="font-mono text-xs text-stone-600 font-bold w-5 shrink-0 select-none">
                                     {(idx + 1).toString().padStart(2, "0")}
                                   </span>
                                   <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border bg-[#F2EFE9]/30 flex items-center justify-center shrink-0 animate-fade-in">

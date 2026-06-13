@@ -621,7 +621,7 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                               className="flex-1 text-center bg-white border border-brand-border p-2.5 rounded-xl flex flex-col items-center justify-between h-40 relative group shadow-2xs"
                             >
                               {/* Item Rank inside Outfit Suggester */}
-                              <span className="absolute bottom-1 right-2.5 font-mono text-[9px] text-[#A6705D] select-none font-bold">
+                              <span className="absolute bottom-1.5 right-2.5 font-mono text-xs text-[#A6705D] select-none font-bold">
                                 #{gIdx + 1}
                               </span>
                               
@@ -808,7 +808,7 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[9px] text-brand-sage w-4 shrink-0 font-bold select-none text-center">
+                          <span className={`font-mono text-xs w-5 shrink-0 font-bold select-none text-center ${isSelected ? "text-stone-200" : "text-stone-500"}`}>
                             {(idx + 1).toString().padStart(2, "0")}
                           </span>
                           <span
@@ -904,7 +904,7 @@ export default function OutfitBuilder({ wardrobe, savedOutfits, onSaveOutfit, on
                       className="flex-1 text-center bg-white border border-brand-border p-2 rounded-lg flex flex-col items-center justify-between h-32 relative shadow-2xs"
                     >
                       {/* Auto item index */}
-                      <span className="absolute bottom-1 right-2 font-mono text-[8px] text-stone-400 select-none font-bold">
+                      <span className="absolute bottom-1.5 right-2 font-mono text-xs text-stone-500 select-none font-bold">
                         #{gIdx + 1}
                       </span>
                       

@@ -107,7 +107,7 @@ export default function WardrobeCard({ item, cardNumber, onSelect, onDelete, onT
     >
       {/* Auto numbering badge */}
       {cardNumber !== undefined && (
-        <div className="absolute top-3 left-3 z-30 bg-white/95 border border-brand-border/80 px-2 py-0.5 rounded-md font-mono text-[9px] font-bold text-stone-500 shadow-3xs select-none">
+        <div className="absolute top-3 left-3 z-30 bg-brand-charcoal text-white border border-transparent px-2.5 py-1 rounded-lg font-mono text-xs font-bold shadow-sm select-none">
           {cardNumber.toString().padStart(2, '0')}
         </div>
       )}
