@@ -82,7 +82,7 @@ export const SEASONS_CONFIG: SeasonConfig[] = [
       },
       {
         title: "Accessories & Footwear (Comfort & Pop)",
-        desc: "樱桃红 (Cherry Red) Doc Martens and Blundstone boots ensure waterproof resilience, while the Statement Red Leather Hobo Bag lifts neutral outerwear coats."
+        desc: "Cherry Red Doc Martens and Blundstone boots ensure waterproof resilience, while the Statement Red Leather Hobo Bag lifts neutral outerwear coats."
       }
     ]
   },
@@ -441,20 +441,22 @@ export function parseSpreadsheetText(text: string, forceSeason?: string): Omit<W
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) return [];
 
-  // 1. Double check if we can guess the active season from the content/headers
+  // 1. Double check if we can guess the active season from the content/headers (only if not explicitly forced)
   let detectedSeason = forceSeason || "Summer 25-26";
-  const contentSnapshot = text.toLowerCase();
+  if (!forceSeason) {
+    const contentSnapshot = text.toLowerCase();
 
-  if (contentSnapshot.includes("handbag inventory") || contentSnapshot.includes("leather, unlined") || contentSnapshot.includes("satchel company")) {
-    detectedSeason = "Handbag Inventory";
-  } else if (contentSnapshot.includes("dream capsule aw") || contentSnapshot.includes("rm williams") || contentSnapshot.includes("brogue boots")) {
-    detectedSeason = "Dream AW";
-  } else if (contentSnapshot.includes("winter capsule 2026") || contentSnapshot.includes("nelson winter") || contentSnapshot.includes("farmers") || contentSnapshot.includes("doc martens")) {
-    detectedSeason = "Winter 26";
-  } else if (contentSnapshot.includes("autumn 26") || contentSnapshot.includes("existing, pulled from storage")) {
-    detectedSeason = "Autumn 26";
-  } else if (contentSnapshot.includes("summer capsule 2025")) {
-    detectedSeason = "Summer 25-26";
+    if (contentSnapshot.includes("handbag inventory") || contentSnapshot.includes("leather, unlined") || contentSnapshot.includes("satchel company")) {
+      detectedSeason = "Handbag Inventory";
+    } else if (contentSnapshot.includes("dream capsule aw") || contentSnapshot.includes("rm williams") || contentSnapshot.includes("brogue boots")) {
+      detectedSeason = "Dream AW";
+    } else if (contentSnapshot.includes("winter capsule 2026") || contentSnapshot.includes("nelson winter") || contentSnapshot.includes("farmers") || contentSnapshot.includes("doc martens")) {
+      detectedSeason = "Winter 26";
+    } else if (contentSnapshot.includes("autumn 26") || contentSnapshot.includes("existing, pulled from storage")) {
+      detectedSeason = "Autumn 26";
+    } else if (contentSnapshot.includes("summer capsule 2025")) {
+      detectedSeason = "Summer 25-26";
+    }
   }
 
   // Find a header line that has actual content keys
