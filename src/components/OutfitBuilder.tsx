@@ -83,6 +83,7 @@ export default function OutfitBuilder({
     return acc;
   }, []);
   const [loading, setLoading] = useState(false);
+  const [usedFallback, setUsedFallback] = useState(false);
   const [aiOutfits, setAiOutfits] = useState<OutfitSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -258,8 +259,11 @@ export default function OutfitBuilder({
         throw new Error(rawData.details || rawData.error || "Failed to generate outfit capsules");
       }
       
+      const responseData = rawData.outfits || rawData;
+      setUsedFallback(rawData.isFallback || false);
+      
       // Map return IDs back to real wardrobe item references
-      const parsedOutfits: OutfitSuggestion[] = rawData.map((out: any) => {
+      const parsedOutfits: OutfitSuggestion[] = responseData.map((out: any) => {
         const itemReferences = (out.itemIds || [])
           .map((id: string) => wardrobe.find(w => w.id === id))
           .filter(Boolean) as WardrobeItem[];
@@ -619,10 +623,15 @@ export default function OutfitBuilder({
                 transition={{ type: "spring", stiffness: 350, damping: 25, mass: 0.8 }}
                 className="space-y-6 pt-5 border-t border-dashed border-brand-border"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h4 className="text-[10.5px] uppercase font-bold text-stone-400 tracking-wider">
                     Creative Look board Suggestions ({aiOutfits.length}) Auto-numbered
                   </h4>
+                  {usedFallback && (
+                    <span className="bg-amber-50 text-amber-600 border border-amber-200/60 text-[9px] px-2.5 py-1 rounded-sm font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-3xs">
+                      <Sparkles className="w-2.5 h-2.5" /> Out of AI Tokens today, randomising
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">

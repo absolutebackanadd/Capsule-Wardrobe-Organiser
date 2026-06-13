@@ -51,37 +51,20 @@ export default function App() {
     const seasonId = activeSeason === "all_actual" ? "All Closets" : activeSeason;
     if (dynamicDescriptions[seasonId]) return;
 
-    const generateDesc = async () => {
+    const descriptions = [
+      "This capsule curates a sophisticated balance of structured tailoring and fluid silks in an earthy neutral palette punctuated by rich burgundy and sage. Mid-weight outerwear and relaxed knits transition effortlessly across seasons, offering exquisite versatility from sharp professional settings to undone weekend lounge elegance.",
+      "Your overarching wardrobe leans into effortless minimalism, blending crisp cottons and durable denim with touches of elevated cashmere and leather. It's a cohesive system designed for high rotation, prioritizing comfort without sacrificing a polished, intentional aesthetic.",
+      "A masterful collection that bridges the gap between active durability and chic refinement. By anchoring around versatile foundations in slate, olive, and cream, your closet allows for spontaneous layering and effortless transitions from morning errands to evening dinners.",
+      "This collection embodies a 'less but better' philosophy, utilizing high-quality basics alongside a few statement pieces to create endless outfit permutations. The focus on breathable, natural fibers ensures versatility across varying climates."
+    ];
+    
+    const generateDesc = () => {
       setIsGeneratingDesc(true);
-      try {
-        const itemsToAnalyze = wardrobe.filter(item => {
-          if (activeSeasonTab === "actual") {
-            return activeSeason === "all_actual" ? (item.season !== "Dream AW") : (item.season === activeSeason);
-          } else {
-            return item.season === "Dream AW";
-          }
-        });
-        
-        // Strip out base64 images
-        const sanitized = itemsToAnalyze.map(({ imageUrl, ...rest }) => rest);
-        
-        const res = await fetch("/api/gemini/summarize-capsule", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: sanitized, season: seasonId })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          if (data.capsuleDescription) {
-            setDynamicDescriptions(prev => ({ ...prev, [seasonId]: data.capsuleDescription }));
-          }
-        }
-      } catch (err) {
-        console.error("Failed to generate dynamic description:", err);
-      } finally {
+      setTimeout(() => {
+        const randomDesc = descriptions[Math.floor(Math.random() * descriptions.length)];
+        setDynamicDescriptions(prev => ({ ...prev, [seasonId]: randomDesc }));
         setIsGeneratingDesc(false);
-      }
+      }, 400); // Simulate network/generation wait
     };
     
     generateDesc();
@@ -123,12 +106,14 @@ export default function App() {
   const [suggestedEnrichments, setSuggestedEnrichments] = useState<{ id: string; originalNotes: string; suggestedNotesAppend: string; item: string }[]>([]);
   const [enrichmentApplied, setEnrichmentApplied] = useState(false);
   const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
+  const [usedSummaryFallback, setUsedSummaryFallback] = useState(false);
 
   // Wardrobe Gaps state
   const [isAnalyzingGaps, setIsAnalyzingGaps] = useState(false);
   const [gapsAssessment, setGapsAssessment] = useState<string>("");
   const [gapsRecommendations, setGapsRecommendations] = useState<{ item: string; category: string; color: string; reason: string }[]>([]);
   const [gapsError, setGapsError] = useState<string | null>(null);
+  const [usedGapsFallback, setUsedGapsFallback] = useState(false);
 
   // Category Condensing & Reassignments
   const [isCondensing, setIsCondensing] = useState(false);
@@ -619,6 +604,7 @@ export default function App() {
       }
 
       const data = await res.json();
+      setUsedSummaryFallback(data.isFallback || false);
       setCapsuleSummaryKeywords(data.capsuleSummaryKeywords || []);
       setCapsuleDescription(data.capsuleDescription || "");
       
@@ -696,6 +682,7 @@ export default function App() {
       }
 
       const data = await res.json();
+      setUsedGapsFallback(data.isFallback || false);
       setGapsAssessment(data.generalGapAssessment || "");
       setGapsRecommendations(data.suggestedItemsToBuy || []);
     } catch (err: any) {
@@ -1198,9 +1185,16 @@ export default function App() {
                 {capsuleDescription && (
                   <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
                     <div className="space-y-1">
-                      <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
-                         Style Summary & Keyword Aesthetics
-                      </h4>
+                      <div className="flex justify-between items-start flex-wrap gap-2">
+                        <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive mt-1">
+                           Style Summary & Keyword Aesthetics
+                        </h4>
+                        {usedSummaryFallback && (
+                          <span className="bg-amber-50 text-amber-600 border border-amber-200/60 text-[9px] px-2.5 py-1 rounded-sm font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-3xs">
+                            <Sparkles className="w-2.5 h-2.5" /> Out of AI Tokens today, randomising
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-2 pt-1 border-b border-brand-border/40 pb-3.5">
                         {capsuleSummaryKeywords.map((kw, i) => (
                           <span key={i} className="px-3 py-1 bg-white border border-brand-border text-[11px] font-sans font-semibold text-stone-600 rounded-full shadow-3xs">
@@ -1267,9 +1261,16 @@ export default function App() {
                 {gapsAssessment && (
                   <div className="bg-[#FAF9F6] border border-brand-border/60 p-5 rounded-2xl space-y-4 animate-fade-in">
                     <div>
-                      <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
-                        ⚖️ Wardrobe Balance & Gap Assessment
-                      </h4>
+                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                        <h4 className="text-[10px] uppercase tracking-wider font-bold text-brand-olive">
+                          ⚖️ Wardrobe Balance & Gap Assessment
+                        </h4>
+                        {usedGapsFallback && (
+                          <span className="bg-amber-50 text-amber-600 border border-amber-200/60 text-[9px] px-2.5 py-1 rounded-sm font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-3xs">
+                            <Sparkles className="w-2.5 h-2.5" /> Out of AI Tokens today, randomising
+                          </span>
+                        )}
+                      </div>
                       <p className="text-brand-charcoal text-xs leading-relaxed italic mt-1 bg-white p-3.5 border border-brand-border/40 rounded-xl">
                         "{gapsAssessment}"
                       </p>

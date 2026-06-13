@@ -191,10 +191,34 @@ Return exactly 3 outfit suggestions as a JSON array.`;
 
     const text = response.text?.trim() || "[]";
     const data = JSON.parse(text);
-    res.json(data);
+    res.json({ outfits: data });
   } catch (error: any) {
-    console.error("Error creating outfits with Gemini:", error);
-    res.status(500).json({ error: "Failed to generate outfits", details: error.message });
+    console.error("Error creating outfits with Gemini, falling back to random sampling:", error);
+    try {
+      // Fallback: Randomly select 3 outfits
+      const { items } = req.body;
+      const tops = items.filter((i: any) => ["Tops", "Dresses", "Outerwear"].includes(i.category || i.aiSuggestedCategory) || (!i.category && !i.aiSuggestedCategory));
+      const bottoms = items.filter((i: any) => ["Bottoms", "Dresses", "Shoes", "Accessories"].includes(i.category || i.aiSuggestedCategory));
+      
+      const fallbackOutfits = [];
+      for(let i=0; i<3; i++) {
+        const top = tops[Math.floor(Math.random() * tops.length)];
+        const bottom = bottoms[Math.floor(Math.random() * bottoms.length)];
+        const outfitItems = [top, bottom].filter(Boolean).map(x => x.id);
+        
+        fallbackOutfits.push({
+          name: `Fallback Shuffle ${i+1}`,
+          description: "A procedurally generated random combination since the styling AI is temporarily resting.",
+          itemIds: outfitItems,
+          occasion: "Casual Everyday",
+          aesthetic: "Eclectic Mix",
+          stylingNotes: "Try mixing and matching these randomly selected pieces to discover an unexpected combination."
+        });
+      }
+      res.json({ outfits: fallbackOutfits, isFallback: true });
+    } catch (fallbackError) {
+      res.status(500).json({ error: "Failed to generate outfits", details: error.message });
+    }
   }
 });
 
@@ -503,8 +527,18 @@ Return exactly this JSON response format:
     const parsed = JSON.parse(response.text?.trim() || "{}");
     res.json(parsed);
   } catch (error: any) {
-    console.error("Error summarizing capsule with Gemini:", error);
-    res.status(500).json({ error: "Failed to compile style summary", details: error.message });
+    console.error("Error summarizing capsule with Gemini, falling back:", error);
+    try {
+      const fallbackResult = {
+        isFallback: true,
+        capsuleSummaryKeywords: ["Minimalist Core", "Utilitarian Polish", "Neutral Textures"],
+        capsuleDescription: "This season anchors on deeply versatile foundation pieces layered thoughtfully with subtle textural variation. It establishes a robust smart-casual equilibrium optimized for transitional wear without relying on excessive trend cycles.",
+        notesEnrichment: []
+      };
+      res.json(fallbackResult);
+    } catch (fallbackErr) {
+      res.status(500).json({ error: "Failed to compile style summary", details: error.message });
+    }
   }
 });
 
@@ -584,7 +618,35 @@ Return exactly this JSON response format:
     res.json(parsed);
   } catch (error: any) {
     console.error("Error evaluating wardrobe gaps:", error);
-    res.status(500).json({ error: "Failed to evaluate gaps", details: error.message });
+    try {
+      const fallbackResult = {
+        isFallback: true,
+        generalGapAssessment: "System is using stochastic fallback logic due to API constraints. Analyzing basic structural limits.",
+        suggestedItemsToBuy: [
+          {
+            item: "Classic Tailored Blazer",
+            category: "Outerwear",
+            color: "Charcoal or Navy",
+            reason: "A structural staple that elevates any casual base."
+          },
+          {
+            item: "Premium Pima Cotton Tee",
+            category: "Tops",
+            color: "White",
+            reason: "An essential layering piece that extends the life of deeper-season outerwear."
+          },
+          {
+            item: "Versatile Leather Loafers",
+            category: "Shoes",
+            color: "Black",
+            reason: "A polished alternative to sneakers that anchors smart-casual outfits."
+          }
+        ]
+      };
+      res.json(fallbackResult);
+    } catch (fallbackErr) {
+      res.status(500).json({ error: "Failed to evaluate gaps", details: error.message });
+    }
   }
 });
 
@@ -664,8 +726,34 @@ Return exactly this JSON response format with "categoryMappings" as an array of 
     }
     res.json({ categoryMapping: dictionary });
   } catch (error: any) {
-    console.error("Error condensing categories with Gemini:", error);
-    res.status(500).json({ error: "Failed to map standard categories", details: error.message });
+    console.error("Error condensing categories with Gemini, using regex fallback:", error);
+    try {
+      const { categories } = req.body;
+      const dictionary: Record<string, string> = {};
+      
+      const regexMap = {
+        "Bottoms": /pant|jean|trouser|short|skirt/i,
+        "Outerwear": /jacket|coat|blazer|cardigan/i,
+        "Shoes": /shoe|boot|sneaker|heel|sandal/i,
+        "Accessories": /bag|belt|hat|scarf|jewelry/i,
+        "Dresses": /dress|gown/i,
+        "Tops": /top|shirt|blouse|tee|sweater/i
+      };
+      
+      categories.forEach((cat: string) => {
+        let matched = "Tops"; // Default
+        for (const [standardCat, regex] of Object.entries(regexMap)) {
+          if (regex.test(cat)) {
+            matched = standardCat;
+            break;
+          }
+        }
+        dictionary[cat] = matched;
+      });
+      res.json({ categoryMapping: dictionary });
+    } catch (fallbackErr) {
+      res.status(500).json({ error: "Failed to map standard categories", details: error.message });
+    }
   }
 });
 
