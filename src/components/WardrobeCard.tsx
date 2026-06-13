@@ -153,7 +153,7 @@ export default function WardrobeCard({ item, cardNumber, onSelect, onDelete, onT
             
             {/* Category label as text watermark style */}
             <span className="font-serif italic text-brand-sage/60 text-[11px] absolute top-3 left-4 select-none">
-              {item.aiSuggestedCategory || "Apparel"} Preview
+              {item.aiSuggestedCategory || "Apparel"}
             </span>
 
             {/* Dynamic Apparel silhouette */}

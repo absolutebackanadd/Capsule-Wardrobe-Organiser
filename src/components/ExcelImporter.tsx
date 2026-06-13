@@ -145,12 +145,12 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
               onChange={(e) => setTargetSeason(e.target.value)}
               className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-2.5 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[210px] focus:ring-1 focus:ring-brand-olive font-medium shadow-3xs"
             >
-              <option value="auto/">Auto-Detect Season Tab</option>
-              <option value="Summer 25-26/">Summer capsule 2025 - 26</option>
-              <option value="Autumn 26/">Autumn 26</option>
-              <option value="Winter 26/">Winter capsule 2026</option>
-              <option value="Handbag Inventory/">Handbag Inventory</option>
-              <option value="Dream AW/">Dream capsule AW (Future)</option>
+              <option value="auto">Auto-Detect Season Tab</option>
+              <option value="Summer 25-26">Summer capsule 2025 - 26</option>
+              <option value="Autumn 26">Autumn 26</option>
+              <option value="Winter 26">Winter capsule 2026</option>
+              <option value="Handbag Inventory">Handbag Inventory</option>
+              <option value="Dream AW">Dream capsule AW (Future)</option>
             </select>
             <FolderUp className="w-3.5 h-3.5 text-brand-sage absolute right-3 top-3 pointer-events-none" />
           </div>

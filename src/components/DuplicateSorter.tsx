@@ -47,6 +47,7 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
   // State to toggle seeing "Suspected Duplicates" vs "Already Linked Items"
   const [activeTab, setActiveTab] = useState<"suspected" | "linked">("suspected");
   const [notification, setNotification] = useState<string | null>(null);
+  const [selectedItemsByGroup, setSelectedItemsByGroup] = useState<Record<string, string[]>>({});
 
   // Auto-dismiss alert after 4 seconds
   useEffect(() => {
@@ -95,16 +96,19 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
         const brandB = normalize(itemB.brand);
 
         let matchReason = "";
+        
+        const colorsAreSame = colA === colB || (colA && colB && (colA.includes(colB) || colB.includes(colA)));
 
         // Suspected duplicate heuristics:
         // 1. Exact item name AND exact color matching (possibly in separate caps)
-        if (nameA === nameB && colA === colB && nameA.length > 2) {
+        if (nameA === nameB && colorsAreSame && nameA.length > 2) {
           matchReason = "Identical garment silhouette & color pairing";
         }
         // 2. Exact item name AND specific brand matched
         else if (
           nameA === nameB && 
           brandA === brandB && 
+          colorsAreSame &&
           brandA !== "" && 
           brandA !== "classic" && 
           brandA !== "unbranded"
@@ -113,7 +117,7 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
         }
         // 3. Close names / substring overlap with same base color
         else if (
-          colA === colB && 
+          colorsAreSame && 
           colA !== "" && 
           colA !== "neutral" && 
           (nameA.includes(nameB) || nameB.includes(nameA)) && 
@@ -379,12 +383,26 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
               </div>
 
               {suspectedGroups.map((group) => {
+                const selectedIds = selectedItemsByGroup[group.id] || group.items.map(i => i.id);
+                const selectedItems = group.items.filter(i => selectedIds.includes(i.id));
+
+                const handleToggleSelection = (itemId: string) => {
+                  setSelectedItemsByGroup(prev => {
+                    const current = prev[group.id] || group.items.map(i => i.id);
+                    if (current.includes(itemId)) {
+                      return { ...prev, [group.id]: current.filter(id => id !== itemId) };
+                    } else {
+                      return { ...prev, [group.id]: [...current, itemId] };
+                    }
+                  });
+                };
+
                 // Find what files/details will end up in the combined preview representation
-                const modelImg = group.items.find(i => i.imageUrl && i.imageUrl.startsWith("http"))?.imageUrl || 
-                                 group.items.find(i => i.imageUrl)?.imageUrl;
-                const modelBrand = group.items.find(i => i.brand && i.brand.toLowerCase() !== "classic" && i.brand.toLowerCase() !== "unbranded")?.brand || 
-                                   group.items.find(i => i.brand)?.brand || "Classic";
-                const hasExistingLinks = group.items.some(i => i.notes && i.notes.includes("http"));
+                const modelImg = selectedItems.find(i => i.imageUrl && i.imageUrl.startsWith("http"))?.imageUrl || 
+                                 selectedItems.find(i => i.imageUrl)?.imageUrl;
+                const modelBrand = selectedItems.find(i => i.brand && i.brand.toLowerCase() !== "classic" && i.brand.toLowerCase() !== "unbranded")?.brand || 
+                                   selectedItems.find(i => i.brand)?.brand || "Classic";
+                const hasExistingLinks = selectedItems.some(i => i.notes && i.notes.includes("http"));
 
                 return (
                   <div 
@@ -399,7 +417,7 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
                             {group.reason}
                           </span>
                           <span className="text-[10px] text-brand-sage font-medium font-sans">
-                            {group.items.length} suspect occurrences
+                            {selectedItems.length} of {group.items.length} selected
                           </span>
                         </div>
                         <h3 className="font-serif font-medium text-brand-charcoal text-base mt-1 capitalize">
@@ -410,16 +428,18 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
                       {/* Sync actions drawer */}
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleKeepSeparate(group.items)}
-                          className="px-3.5 py-1.5 border border-brand-border text-brand-sage hover:text-brand-charcoal bg-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                          onClick={() => handleKeepSeparate(selectedItems)}
+                          disabled={selectedItems.length < 2}
+                          className="px-3.5 py-1.5 border border-brand-border text-brand-sage hover:text-brand-charcoal bg-white disabled:opacity-50 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                         >
                           <X className="w-3.5 h-3.5" /> Keep Separate
                         </button>
                         <button
-                          onClick={() => handleLinkDuplicates(group.items)}
-                          className="px-4 py-1.5 bg-brand-olive hover:bg-[#484833] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-3xs"
+                          onClick={() => handleLinkDuplicates(selectedItems)}
+                          disabled={selectedItems.length < 2}
+                          className="px-4 py-1.5 bg-brand-olive hover:bg-[#484833] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-3xs"
                         >
-                          <Link2 className="w-3.5 h-3.5" /> Sync & Link ID Keys
+                          <Link2 className="w-3.5 h-3.5" /> Sync & Link Selected
                         </button>
                       </div>
                     </div>
@@ -428,9 +448,21 @@ export default function DuplicateSorter({ wardrobe, onUpdateWardrobe }: Duplicat
                     <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-[#FCFCFC]">
                       {group.items.map((item) => (
                         <div 
-                          key={item.id} 
-                          className="bg-white border border-brand-border/65 p-4 rounded-xl flex gap-3.5 shadow-3xs hover:border-brand-border transition-all relative"
+                          key={item.id}
+                          onClick={() => handleToggleSelection(item.id)}
+                          className={`bg-white border p-4 rounded-xl flex gap-3.5 shadow-3xs transition-all relative cursor-pointer ${
+                            selectedIds.includes(item.id) 
+                              ? "border-brand-olive/60 bg-[#FAFAF9]" 
+                              : "border-brand-border/65 hover:border-brand-border opacity-70"
+                          }`}
                         >
+                          {/* Checkbox indicator */}
+                          <div className={`absolute -top-2 -right-2 w-5 h-5 rounded-full border-2 flex items-center justify-center bg-white ${
+                            selectedIds.includes(item.id) ? "border-brand-olive text-brand-olive" : "border-brand-border text-transparent"
+                          }`}>
+                            <Check className="w-3 h-3" />
+                          </div>
+
                           {/* Item image or blank frame */}
                           <div className="w-16 h-20 bg-brand-greige border border-brand-border/40 rounded-lg overflow-hidden shrink-0 flex items-center justify-center relative bg-center bg-cover"
                             style={item.imageUrl ? { backgroundImage: `url(${item.imageUrl})` } : undefined}

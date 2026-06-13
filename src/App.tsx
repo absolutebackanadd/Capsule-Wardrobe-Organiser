@@ -1367,12 +1367,12 @@ export default function App() {
                   </div>
 
                   {/* Fast Filtering options Category */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="relative h-full">
+                  <div className="grid grid-cols-2 md:flex md:items-center gap-2 w-full md:w-auto">
+                    <div className="relative w-full">
                       <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[125px] focus:ring-1 focus:ring-brand-olive text-left"
+                        className="w-full bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 focus:ring-1 focus:ring-brand-olive text-left"
                       >
                         <option value="all">All Apparel</option>
                         {Array.from(new Set(wardrobe.map(w => w.aiSuggestedCategory || "Tops"))).filter((cat): cat is string => !!cat).map(cat => (
@@ -1383,11 +1383,11 @@ export default function App() {
                     </div>
 
                     {/* Status filtering */}
-                    <div className="relative h-full">
+                    <div className="relative w-full">
                       <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                        className="w-full bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 focus:ring-1 focus:ring-brand-olive"
                       >
                         <option value="all">All Stats</option>
                         <option value="existing">In Closet</option>
@@ -1398,11 +1398,11 @@ export default function App() {
 
                     {/* Brands */}
                     {uniqueBrands.length > 0 && (
-                      <div className="relative h-full">
+                      <div className="relative w-full">
                         <select
                           value={brandFilter}
                           onChange={(e) => setBrandFilter(e.target.value)}
-                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                          className="w-full bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 focus:ring-1 focus:ring-brand-olive"
                         >
                           <option value="all">All Brands</option>
                           {uniqueBrands.map(br => (
@@ -1415,11 +1415,11 @@ export default function App() {
 
                     {/* Color Filter */}
                     {uniqueColors.length > 0 && (
-                      <div className="relative h-full">
+                      <div className="relative w-full">
                         <select
                           value={colorFilter}
                           onChange={(e) => setColorFilter(e.target.value)}
-                          className="bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 min-w-[115px] focus:ring-1 focus:ring-brand-olive"
+                          className="w-full bg-white border border-brand-border text-brand-charcoal text-xs px-4 py-3 rounded-sm focus:outline-none cursor-pointer appearance-none pr-8 focus:ring-1 focus:ring-brand-olive"
                         >
                           <option value="all">All Colors</option>
                           {uniqueColors.map(col => (
@@ -2107,11 +2107,11 @@ export default function App() {
                         onChange={(e) => setSelectedItem({ ...selectedItem, season: e.target.value })}
                         className="w-full bg-white border border-stone-200 text-stone-800 text-xs px-3.5 py-2 rounded-lg"
                       >
-                        <option value="Summer 25-26/">Summer capsule 2025 - 26</option>
-                        <option value="Autumn 26/">Autumn 26</option>
-                        <option value="Winter 26/">Winter capsule 2026</option>
-                        <option value="Handbag Inventory/">Handbag Inventory</option>
-                        <option value="Dream AW/">Dream AW (Future Planning)</option>
+                        <option value="Summer 25-26">Summer capsule 2025 - 26</option>
+                        <option value="Autumn 26">Autumn 26</option>
+                        <option value="Winter 26">Winter capsule 2026</option>
+                        <option value="Handbag Inventory">Handbag Inventory</option>
+                        <option value="Dream AW">Dream AW (Future Planning)</option>
                       </select>
                     </div>
 
@@ -2478,11 +2478,11 @@ export default function App() {
                     onChange={(e) => setNewItem({ ...newItem, season: e.target.value })}
                     className="w-full bg-white border border-stone-200 text-stone-850 text-xs px-3.5 py-2 rounded-lg focus:ring-1 focus:ring-stone-400 focus:outline-none"
                   >
-                    <option value="Summer 25-26/">Summer capsule 2025 - 26</option>
-                    <option value="Autumn 26/">Autumn 26</option>
-                    <option value="Winter 26/">Winter capsule 2026</option>
-                    <option value="Handbag Inventory/">Handbag Inventory</option>
-                    <option value="Dream AW/">Dream AW (Future Planning)</option>
+                    <option value="Summer 25-26">Summer capsule 2025 - 26</option>
+                    <option value="Autumn 26">Autumn 26</option>
+                    <option value="Winter 26">Winter capsule 2026</option>
+                    <option value="Handbag Inventory">Handbag Inventory</option>
+                    <option value="Dream AW">Dream AW (Future Planning)</option>
                   </select>
                 </div>
 

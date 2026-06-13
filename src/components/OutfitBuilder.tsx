@@ -365,12 +365,12 @@ export default function OutfitBuilder({
                 onChange={(e) => handleLocalCapsuleChange(e.target.value)}
                 className="appearance-none bg-white border border-brand-border text-brand-charcoal font-semibold text-xs py-1.5 pl-3 pr-8 rounded-sm focus:outline-none focus:ring-1 focus:ring-brand-olive cursor-pointer"
               >
-                <option value="all_actual/">All Actual Pieces</option>
-                <option value="Summer 25-26/">Summer 25-26</option>
-                <option value="Autumn 26/">Autumn 26</option>
-                <option value="Winter 26/">Winter 26</option>
-                <option value="Handbag Inventory/">Handbag Inventory</option>
-                <option value="Dream AW/">Dream AW Future</option>
+                <option value="all_actual">All Actual Pieces</option>
+                <option value="Summer 25-26">Summer 25-26</option>
+                <option value="Autumn 26">Autumn 26</option>
+                <option value="Winter 26">Winter 26</option>
+                <option value="Handbag Inventory">Handbag Inventory</option>
+                <option value="Dream AW">Dream AW Future</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-brand-sage">
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -514,41 +514,92 @@ export default function OutfitBuilder({
             </p>
           )}
 
-          {/* Flashy Stylist Active Loading Board */}
-          {loading && (
-            <div className="py-12 flex flex-col items-center justify-center space-y-5 bg-white rounded-2xl border border-brand-border/60 shadow-3xs max-w-full overflow-hidden relative">
-              {/* Halos animation background */}
-              <div className="absolute inset-0 m-auto w-40 h-40 bg-brand-olive/5 blur-3xl rounded-full animate-pulse" />
+          {/* Dealer Table & Results Area */}
+          {(loading || aiOutfits.length > 0) && (
+            <div className="flex flex-col md:flex-row gap-6 xl:gap-10 mt-6 pt-6 border-t border-dashed border-brand-border h-full relative">
               
-              {/* Spinner silhouettes assembly mimicking hanger reels */}
-              <div className="flex items-center gap-4">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                  className="w-12 h-14 border border-dashed border-brand-olive/35 rounded-full flex items-center justify-center text-brand-olive/45"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </motion.div>
-                <div className="relative">
-                  <div className="w-16 h-16 rounded-full border-2 border-brand-olive border-t-transparent animate-spin flex items-center justify-center" />
-                  <Sparkles className="w-5 h-5 text-brand-olive absolute inset-0 m-auto animate-pulse" />
+              {/* The "Dealer" Deck area */}
+              <div className="hidden md:flex flex-col items-center justify-start w-32 shrink-0 relative pt-10 pb-6 z-10">
+                <div className="relative w-24 h-32 border border-dashed border-brand-border/40 rounded-xl flex items-center justify-center">
+                  <div className="absolute font-mono text-[8px] text-stone-300 uppercase font-bold tracking-widest text-center mt-20">Full Inventory</div>
+                  
+                  {/* visual stack of cards */}
+                  {[2, 1, 0].map((i) => (
+                    <motion.div
+                      key={i}
+                      initial={false}
+                      animate={
+                        loading
+                          ? { y: [0, -8, 0], x: [(i - 1) * 3, -(i - 1) * 3, (i - 1) * 3], rotate: [i * 3, -i * 3, i * 3] }
+                          : { y: i * 4, x: i * 4, rotate: (i - 1) * 4 }
+                      }
+                      transition={
+                        loading
+                          ? { duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: i * 0.2 }
+                          : { type: "spring", stiffness: 200, damping: 20 }
+                      }
+                      className="absolute inset-0 bg-white border border-brand-border shadow-xs rounded-xl flex items-center justify-center p-1.5"
+                      style={{ transformOrigin: "bottom center", zIndex: 10 - i }}
+                    >
+                      <div className={`w-full h-full border border-stone-100 rounded-lg bg-[#FAF9F6] flex flex-col justify-between p-2 transition-opacity ${loading ? 'opacity-40' : 'opacity-80'}`}>
+                         <div className="w-5 h-5 bg-stone-200 rounded-sm" />
+                         <div className="space-y-1">
+                           <div className="h-1 bg-stone-200/80 rounded w-full" />
+                           <div className="h-1 bg-stone-200/80 rounded w-2/3" />
+                         </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {/* spark during loading */}
+                  {loading && (
+                    <div className="absolute -top-3 -right-3 z-20">
+                       <Sparkles className="w-4 h-4 text-brand-olive animate-pulse" />
+                    </div>
+                  )}
                 </div>
-                <motion.div
-                  animate={{ rotate: -360 }}
-                  transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                  className="w-12 h-14 border border-dashed border-brand-olive/35 rounded-full flex items-center justify-center text-brand-olive/45"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                </motion.div>
+                <p className="mt-8 text-[9px] font-bold text-center text-brand-sage uppercase tracking-wider leading-relaxed">
+                  {loading ? "Engine Shuffling Cards..." : "Inventory Deck"}
+                </p>
               </div>
 
-              <div className="text-center space-y-1.5 z-10 px-5 max-w-md">
-                <h4 className="font-serif font-semibold text-brand-charcoal text-base">Analytical Engine orchestrating look permutations...</h4>
-                <p className="text-brand-sage text-xs font-mono tracking-wide uppercase">{loaderPhrase}</p>
-                <p className="text-[10px] text-brand-sage/60">Cross-referencing active capsule items with logged corrections ledger</p>
-              </div>
-            </div>
-          )}
+              {/* Main dynamic results area */}
+              <div className="flex-1 min-w-0">
+                {/* Flashy Stylist Active Loading Board */}
+                {loading && (
+                  <div className="py-12 flex flex-col items-center justify-center space-y-5 bg-white rounded-2xl border border-brand-border/60 shadow-3xs max-w-full overflow-hidden relative">
+                    {/* Halos animation background */}
+                    <div className="absolute inset-0 m-auto w-40 h-40 bg-brand-olive/5 blur-3xl rounded-full animate-pulse" />
+                    
+                    {/* Spinner silhouettes assembly mimicking hanger reels */}
+                    <div className="flex items-center gap-4">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+                        className="w-12 h-14 border border-dashed border-brand-olive/35 rounded-full flex items-center justify-center text-brand-olive/45"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </motion.div>
+                      <div className="relative">
+                        <div className="w-16 h-16 rounded-full border-2 border-brand-olive border-t-transparent animate-spin flex items-center justify-center" />
+                        <Sparkles className="w-5 h-5 text-brand-olive absolute inset-0 m-auto animate-pulse" />
+                      </div>
+                      <motion.div
+                        animate={{ rotate: -360 }}
+                        transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+                        className="w-12 h-14 border border-dashed border-brand-olive/35 rounded-full flex items-center justify-center text-brand-olive/45"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </motion.div>
+                    </div>
+
+                    <div className="text-center space-y-1.5 z-10 px-5 max-w-md">
+                      <h4 className="font-serif font-semibold text-brand-charcoal text-base">Analytical Engine orchestrating look permutations...</h4>
+                      <p className="text-brand-sage text-xs font-mono tracking-wide uppercase">{loaderPhrase}</p>
+                      <p className="text-[10px] text-brand-sage/60">Cross-referencing active capsule items with logged corrections ledger</p>
+                    </div>
+                  </div>
+                )}
 
           {/* AI Output results list collections */}
           <AnimatePresence>
@@ -681,8 +732,16 @@ export default function OutfitBuilder({
                         {/* Responsive, wrapped layout that never stretches out of boundaries */}
                         <div className="w-full lg:w-auto max-w-full flex flex-wrap items-center justify-center gap-2 bg-brand-greige/35 rounded-2xl p-4 border border-brand-border self-center md:pb-5">
                           {outfit.items.map((garment, gIdx) => (
-                            <div
+                            <motion.div
                               key={gIdx}
+                              initial={{ x: -250, y: -40, opacity: 0, rotate: -25, scale: 0.5 }}
+                              animate={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 1 }}
+                              transition={{ 
+                                type: "spring", 
+                                stiffness: 180, 
+                                damping: 16, 
+                                delay: gIdx * 0.12 + 0.1 
+                              }}
                               className="w-[82px] shrink-0 text-center bg-white border border-brand-border p-2 rounded-xl flex flex-col items-center justify-between h-36 relative group shadow-2xs hover:border-brand-olive hover:shadow-xs transition-all duration-200"
                             >
                               {/* Item Rank inside Outfit Suggester */}
@@ -691,21 +750,20 @@ export default function OutfitBuilder({
                               </span>
                               
                               <span
-                                className={`absolute top-1 left-1.5 w-2 h-2 rounded-full border border-white shadow-3xs ${
-                                  garment.status === "buy" ? "bg-[#A6705D]" : "bg-[#4A674A]"
-                                }`}
-                                title={garment.status === "buy" ? "Wishlist buy item suggestion" : "Closet owned item"}
+                                className="absolute top-1 left-1.5 w-2 h-2 rounded-full border border-white shadow-3xs"
+                                style={{ backgroundColor: garment.hex || "#e5e5e5" }}
+                                title={`${garment.color} (${garment.status === "buy" ? "Wishlist item" : "Owned item"})`}
                               />
                               {/* Graphic core */}
                               <div className="w-10 h-14 flex items-center justify-center">
                                 <ApparelSilhouette category={garment.aiSuggestedCategory || "Tops"} hexColor={garment.hex} />
                               </div>
                               {/* Info */}
-                              <div className="w-full pt-1 border-t border-dashed border-stone-100">
-                                <p className="text-[9px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5">
+                              <div className="w-full pt-1 border-t border-dashed border-stone-100 relative">
+                                <p className="text-[9px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5 pr-5">
                                   {garment.item}
                                 </p>
-                                <p className="text-[7.5px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none">
+                                <p className="text-[7.5px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none pr-5">
                                   {garment.brand || "Unbranded"}
                                 </p>
                               </div>
@@ -715,7 +773,7 @@ export default function OutfitBuilder({
                                 <div className="space-y-1 overflow-hidden">
                                   <div className="flex items-center gap-1.5 justify-between">
                                     <span className="font-sans text-[8px] uppercase tracking-wider font-bold bg-brand-greige px-1.5 py-0.5 rounded-sm line-clamp-1">{garment.aiSuggestedCategory || "Tops"}</span>
-                                    <span className={`w-2 h-2 rounded-full ${garment.status === "buy" ? "bg-[#A6705D]" : "bg-[#4A674A]"}`} />
+                                    <span className="w-2.5 h-2.5 rounded-full border border-stone-200 shadow-3xs shrink-0" style={{ backgroundColor: garment.hex || "#e5e5e5" }} title={garment.color} />
                                   </div>
                                   <h5 className="font-serif font-bold text-brand-charcoal text-[11.5px] leading-tight capitalize truncate">{garment.item}</h5>
                                   <p className="text-[10px] text-brand-sage font-medium uppercase font-sans tracking-wide leading-none">{garment.brand || "Unbranded"}</p>
@@ -730,7 +788,7 @@ export default function OutfitBuilder({
                                 </div>
                               </div>
 
-                            </div>
+                            </motion.div>
                           ))}
                         </div>
                       </motion.div>
@@ -740,8 +798,11 @@ export default function OutfitBuilder({
               </motion.div>
             )}
           </AnimatePresence>
-        </section>
-      )}
+        </div>
+      </div>
+    )}
+  </section>
+)}
 
       {/* REPOSITORY ALIGNMENT MEMORIES LEDGER */}
       <section className="bg-white rounded-sm border border-brand-border p-5 space-y-3 shadow-3xs hover:shadow-xs transition-shadow">
@@ -1008,23 +1069,31 @@ export default function OutfitBuilder({
                 {/* Displaying horizontal mini wardrobe cards within Pinned Portfolio Set */}
                 <div className="w-full md:w-auto max-w-full flex flex-wrap items-center justify-start gap-1.5 bg-brand-greige/30 rounded-xl p-2.5 border border-brand-border self-center md:pb-3.5">
                   {outfit.items.map((garment, gIdx) => (
-                    <div
+                    <motion.div
                       key={gIdx}
+                      initial={{ x: -150, y: -40, opacity: 0, rotate: -25, scale: 0.5 }}
+                      animate={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 1 }}
+                      transition={{ 
+                        type: "spring", 
+                        stiffness: 220, 
+                        damping: 18, 
+                        delay: gIdx * 0.15 + 0.1 
+                      }}
                       className="w-[80px] shrink-0 text-center bg-white border border-brand-border p-2 rounded-lg flex flex-col items-center justify-between h-32 relative group shadow-2xs hover:border-brand-olive hover:shadow-xs transition-all duration-200"
                     >
                       {/* Auto item index */}
-                      <span className="absolute bottom-1 right-2 font-mono text-[9px] text-stone-500 select-none font-bold">
+                      <span className="absolute top-1 right-1.5 font-mono text-[8.5px] text-stone-400 select-none font-bold">
                         #{gIdx + 1}
                       </span>
                       
                       <div className="w-10 h-14 flex items-center justify-center">
                         <ApparelSilhouette category={garment.aiSuggestedCategory || "Tops"} hexColor={garment.hex} />
                       </div>
-                      <div className="w-full border-t border-dashed border-stone-100 pt-0.5">
-                        <p className="text-[9px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5">
+                      <div className="w-full border-t border-dashed border-stone-100 pt-0.5 relative">
+                        <p className="text-[9px] font-bold text-brand-charcoal truncate block capitalize leading-none mb-0.5 pr-4">
                           {garment.item}
                         </p>
-                        <p className="text-[7.5px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none">
+                        <p className="text-[7.5px] font-semibold text-brand-sage truncate block uppercase font-sans leading-none pr-4">
                           {garment.brand || "Unbranded"}
                         </p>
                       </div>
@@ -1034,7 +1103,7 @@ export default function OutfitBuilder({
                         <div className="space-y-1 overflow-hidden">
                           <div className="flex items-center gap-1.5 justify-between">
                             <span className="font-sans text-[7.5px] uppercase tracking-wider font-bold bg-brand-greige px-1.5 py-0.5 rounded-sm line-clamp-1">{garment.aiSuggestedCategory || "Tops"}</span>
-                            <span className={`w-2 h-2 rounded-full ${garment.status === "buy" ? "bg-[#A6705D]" : "bg-[#4A674A]"}`} />
+                            <span className="w-2.5 h-2.5 rounded-full border border-stone-200 shadow-3xs shrink-0" style={{ backgroundColor: garment.hex || "#e5e5e5" }} title={garment.color} />
                           </div>
                           <h5 className="font-serif font-bold text-brand-charcoal text-[11px] leading-tight capitalize truncate">{garment.item}</h5>
                           <p className="text-[9.5px] text-brand-sage font-medium uppercase font-sans tracking-wide leading-none">{garment.brand || "Unbranded"}</p>
@@ -1049,7 +1118,7 @@ export default function OutfitBuilder({
                         </div>
                       </div>
 
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </motion.div>
