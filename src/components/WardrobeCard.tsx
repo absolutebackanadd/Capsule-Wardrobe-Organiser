@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 interface WardrobeCardProps {
   key?: React.Key;
   item: WardrobeItem;
+  cardNumber?: number;
   onSelect: (item: WardrobeItem) => void;
   onDelete?: (id: string) => void;
   onToggleStatus?: (id: string) => void;
@@ -91,7 +92,7 @@ export function ApparelSilhouette({ category, hexColor }: { category: string; he
   }
 }
 
-export default function WardrobeCard({ item, onSelect, onDelete, onToggleStatus }: WardrobeCardProps) {
+export default function WardrobeCard({ item, cardNumber, onSelect, onDelete, onToggleStatus }: WardrobeCardProps) {
   const isExisting = item.status === "existing";
 
   return (
@@ -104,6 +105,12 @@ export default function WardrobeCard({ item, onSelect, onDelete, onToggleStatus 
       className="group relative bg-[#FAF9F6] rounded-[20px] border border-brand-border overflow-hidden flex flex-col justify-between shadow-[0_4px_12px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow"
       id={`wardrobe-card-${item.id}`}
     >
+      {/* Auto numbering badge */}
+      {cardNumber !== undefined && (
+        <div className="absolute top-3 left-3 z-30 bg-white/95 border border-brand-border/80 px-2 py-0.5 rounded-md font-mono text-[9px] font-bold text-stone-500 shadow-3xs select-none">
+          {cardNumber.toString().padStart(2, '0')}
+        </div>
+      )}
       {/* Extreme Right Action Buttons */}
       <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white/90 p-0.5 rounded-lg border border-brand-border backdrop-blur-xs shadow-xs">
         {onDelete && (

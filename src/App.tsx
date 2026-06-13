@@ -1434,7 +1434,7 @@ export default function App() {
                   }}
                 >
                   <AnimatePresence>
-                    {filteredItems.map(item => (
+                    {filteredItems.map((item, idx) => (
                       <div 
                         key={item.id} 
                         style={{ fontSize: `${zoomLevel}%` }}
@@ -1442,6 +1442,7 @@ export default function App() {
                       >
                         <WardrobeCard
                           item={item}
+                          cardNumber={idx + 1}
                           onSelect={setSelectedItem}
                           onDelete={handleDeleteItem}
                           onToggleStatus={handleToggleStatus}
@@ -1486,14 +1487,19 @@ export default function App() {
                             >
                               {/* Photo / Silhouette */}
                               <td className={`px-5 ${paddingStyle}`}>
-                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border bg-[#F2EFE9]/30 flex items-center justify-center shrink-0">
-                                  {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={item.item} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                  ) : (
-                                    <div className="w-5 h-5 flex items-center justify-center">
-                                      <ApparelSilhouette category={item.aiSuggestedCategory || "Tops"} hexColor={item.hex} />
-                                    </div>
-                                  )}
+                                <div className="flex items-center gap-2.5">
+                                  <span className="font-mono text-[10px] text-stone-400 font-semibold w-5 shrink-0 select-none">
+                                    {(idx + 1).toString().padStart(2, "0")}
+                                  </span>
+                                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-brand-border bg-[#F2EFE9]/30 flex items-center justify-center shrink-0 animate-fade-in">
+                                    {item.imageUrl ? (
+                                      <img src={item.imageUrl} alt={item.item} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      <div className="w-5 h-5 flex items-center justify-center">
+                                        <ApparelSilhouette category={item.aiSuggestedCategory || "Tops"} hexColor={item.hex} />
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
 

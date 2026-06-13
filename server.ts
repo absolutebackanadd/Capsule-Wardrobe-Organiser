@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
@@ -120,11 +121,29 @@ app.post("/api/gemini/suggest-outfits", async (req, res) => {
       status: t.status
     }));
 
+    // Read local styling memories to prevent repeating styling mistakes
+    let stylingMemories = "";
+    const memoriesPath = path.join(process.cwd(), "memories.md");
+    try {
+      if (fs.existsSync(memoriesPath)) {
+        stylingMemories = fs.readFileSync(memoriesPath, "utf-8");
+      } else {
+        // Bootstrap memories file
+        fs.writeFileSync(memoriesPath, `# Gemini Styling Correction Log\n\nThis file lists user styling feedback and outfit suitability corrections.\n`, "utf-8");
+      }
+    } catch (fsErr) {
+      console.warn("Could not read/write memories.md:", fsErr);
+    }
+
     const prompt = `You are a high-end fashion director specializing in Capsule Wardrobes. 
 I have a list of clothes in my closet (marked "existing") and some on my wish list (marked "buy"). 
 Based on these items, generate 3 highly cohesive, elegant outfit capsules. 
 
-Focusing on the user's objective: "${objective || "Create versatile everyday outfits"}"
+STRICT LEARNED RULES & FEEDBACK CONSTRAINTS:
+You MUST follow the user corrections and styling suitability memories below. If a correction states that an item, color, brand, or style is unsuitable for a specific activity (e.g., kids active days, errand days, church) or shouldn't go together, you MUST STRICTLY obey that negative constraint and do NOT make that mistake again:
+${stylingMemories || "No rules registered yet."}
+
+Focusing on the user's objective/activity: "${objective || "Create versatile everyday outfits"}"
 
 Each outfit should combine 2-4 items from the list. Try to mostly use "existing" items, but you can incorporate up to ONE "buy" item per outfit to show how she can integrate her wishlist items beautifully!
 
@@ -630,6 +649,72 @@ Return exactly this JSON response format:
   } catch (error: any) {
     console.error("Error condensing categories with Gemini:", error);
     res.status(500).json({ error: "Failed to map standard categories", details: error.message });
+  }
+});
+
+
+// Endpoint 9: Log styling corrections to memories.md (written locally in the repo)
+app.post("/api/memory/wrong", async (req, res) => {
+  try {
+    const { activity, feedback, itemsList, outfitName } = req.body;
+    if (!feedback) {
+      return res.status(400).json({ error: "Feedback detail is required to log a correction." });
+    }
+
+    const memoriesPath = path.join(process.cwd(), "memories.md");
+    const dateStr = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const formattedEntry = `
+### Correction: ${outfitName || "Custom Styled Outfit"} for "${activity || "General"}" (Logged ${dateStr})
+- **Activity context**: ${activity || "Not specified"}
+- **Styled items**: ${itemsList || "None designated"}
+- **Styling feedback / Learned constraint**: ${feedback}
+-------------------------------------------------------------------------
+`;
+
+    // Make sure memories.md exists
+    if (!fs.existsSync(memoriesPath)) {
+      fs.writeFileSync(memoriesPath, `# Gemini Styling Correction Log\n\nThis file lists user styling feedback and outfit suitability corrections.\n`, "utf-8");
+    }
+
+    fs.appendFileSync(memoriesPath, formattedEntry, "utf-8");
+    res.json({ success: true, message: "Memory logged locally in memories.md!" });
+  } catch (err: any) {
+    console.error("Error writing memory correction:", err);
+    res.status(500).json({ error: "Failed to persist memory locally", details: err.message });
+  }
+});
+
+// Endpoint 10: Fetch the contents of memories.md so the UI can display recorded corrections
+app.get("/api/memory/list", async (req, res) => {
+  try {
+    const memoriesPath = path.join(process.cwd(), "memories.md");
+    if (!fs.existsSync(memoriesPath)) {
+      fs.writeFileSync(memoriesPath, `# Gemini Styling Correction Log\n\nThis file lists user styling feedback and outfit suitability corrections.\n`, "utf-8");
+    }
+    const content = fs.readFileSync(memoriesPath, "utf-8");
+    res.json({ content });
+  } catch (err: any) {
+    console.error("Error reading styling memories:", err);
+    res.status(500).json({ error: "Failed to retrieve memories" });
+  }
+});
+
+// Endpoint 11: Clear memories.md back to default bootstrap state
+app.post("/api/memory/clear", async (req, res) => {
+  try {
+    const memoriesPath = path.join(process.cwd(), "memories.md");
+    fs.writeFileSync(memoriesPath, `# Gemini Styling Correction Log\n\nThis file lists user styling feedback and outfit suitability corrections.\n`, "utf-8");
+    res.json({ success: true, message: "Correction logs reset." });
+  } catch (err: any) {
+    console.error("Error clearing styling memories:", err);
+    res.status(500).json({ error: "Failed to reset memories" });
   }
 });
 
