@@ -250,8 +250,8 @@ Generate 4 perfect items that would fit this aesthetic. Include standardized cat
 
 // Endpoint 4: Online Image Finder for Wardrobe Items
 app.post("/api/image-search", async (req, res) => {
+  const { item, color, brand } = req.body || {};
   try {
-    const { item, color, brand } = req.body;
     if (!item) {
       return res.status(400).json({ error: "Item name is required for image search" });
     }
@@ -308,6 +308,100 @@ app.post("/api/image-search", async (req, res) => {
     console.warn("\n[IMAGE CODES]: Web image locator search had a connection issue. Using stable Flickr fashion fallback.");
     const fallbackUrl = `https://loremflickr.com/400/450/fashion,clothing,${encodeURIComponent(item?.toLowerCase()?.replace(/[^a-z0-9]/g, "") || "apparel")}`;
     res.json({ imageUrl: fallbackUrl }); // Fallback gracefully
+  }
+});
+
+
+// Endpoint 5: Page Url Retail Image Scraper - scrapes og:image or high-quality product images from custom domains
+app.post("/api/scrape-image", async (req, res) => {
+  const { url } = req.body || {};
+  if (!url) {
+    return res.status(400).json({ error: "No URL was entered. Please provide a storefront or catalog link." });
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return res.status(400).json({ error: "Only valid HTTP and HTTPS URLs can be scraped." });
+    }
+  } catch (e) {
+    return res.status(400).json({ error: "Please enter a valid webpage URL link." });
+  }
+
+  try {
+    console.log(`\n[SCRAPER]: Fetching URL: ${url} ...\n`);
+    const fResponse = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9"
+      },
+      redirect: "follow"
+    });
+
+    if (!fResponse.ok) {
+      return res.status(400).json({ error: `The store page couldn't be requested. (HTTP Status ${fResponse.status})` });
+    }
+
+    const html = await fResponse.text();
+
+    // 1. Look for og:image tags
+    const ogRegex = /<meta\s+[^>]*property=["']og:image["']\s+content=["']([^"']+)["']/i;
+    const ogRegexReverse = /<meta\s+[^>]*content=["']([^"']+)["']\s+property=["']og:image["']/i;
+    const twitterRegex = /<meta\s+[^>]*name=["']twitter:image["']\s+content=["']([^"']+)["']/i;
+    const twitterRegexReverse = /<meta\s+[^>]*content=["']([^"']+)["']\s+name=["']twitter:image["']/i;
+    const itemPropRegex = /<meta\s+[^>]*itemprop=["']image["']\s+content=["']([^"']+)["']/i;
+    const itemPropRegexReverse = /<meta\s+[^>]*content=["']([^"']+)["']\s+itemprop=["']image["']/i;
+
+    let scrapeUrl = "";
+    const matchOg = html.match(ogRegex) || html.match(ogRegexReverse);
+    const matchTwitter = html.match(twitterRegex) || html.match(twitterRegexReverse);
+    const matchItemProp = html.match(itemPropRegex) || html.match(itemPropRegexReverse);
+
+    if (matchOg) {
+      scrapeUrl = matchOg[1];
+    } else if (matchTwitter) {
+      scrapeUrl = matchTwitter[1];
+    } else if (matchItemProp) {
+      scrapeUrl = matchItemProp[1];
+    } else {
+      // Find standard high resolution images
+      const imgRegex = /<img\s+[^>]*src=["']([^"']+)["']/gi;
+      let match;
+      const images: string[] = [];
+      while ((match = imgRegex.exec(html)) !== null) {
+        images.push(match[1]);
+      }
+      
+      const productImg = images.find(img => {
+        const lower = img.toLowerCase();
+        return (lower.includes("product") || lower.includes("garment") || lower.includes("model") || lower.includes("detail") || lower.includes("goods") || lower.includes("media"));
+      });
+      scrapeUrl = productImg || images.find(img => !img.includes("logo") && !img.includes("icon")) || images[0] || "";
+    }
+
+    if (scrapeUrl) {
+      scrapeUrl = scrapeUrl.replace(/&amp;/g, "&");
+
+      // Resolve relative links
+      if (scrapeUrl.startsWith("//")) {
+        scrapeUrl = "https:" + scrapeUrl;
+      } else if (scrapeUrl.startsWith("/")) {
+        const origin = new URL(url).origin;
+        scrapeUrl = origin + scrapeUrl;
+      } else if (!scrapeUrl.startsWith("http://") && !scrapeUrl.startsWith("https://") && !scrapeUrl.startsWith("data:")) {
+        const origin = new URL(url).origin;
+        scrapeUrl = origin + "/" + scrapeUrl;
+      }
+
+      console.log(`[SCRAPER]: Success! Found scraped image link: ${scrapeUrl}`);
+      return res.json({ imageUrl: scrapeUrl });
+    }
+
+    return res.status(404).json({ error: "No clothing display photo could be scraped from this storefront. Try entering a direct image URL instead." });
+  } catch (err: any) {
+    console.error("[SCRAPER ERROR]:", err);
+    return res.status(500).json({ error: "Unable to access domain. The host might be blocking automated request visits. Please paste a direct image link or upload a local photo file instead.", details: err.message });
   }
 });
 

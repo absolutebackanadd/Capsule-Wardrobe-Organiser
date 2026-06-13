@@ -168,6 +168,31 @@ export default function ExcelImporter({ onImportComplete, onClearWardrobe, items
         </div>
       </div>
 
+      {/* Visual Import Guides & Answers to User Queries */}
+      <div className="bg-amber-50/20 border border-amber-600/10 rounded-[20px] p-5 text-brand-charcoal space-y-3.5 shadow-3xs">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800 font-sans flex items-center gap-1.5">
+          <Info className="w-4 h-4 text-amber-700 font-sans" /> Professional Import Guidelines
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+          <div className="space-y-1.5">
+            <p className="font-semibold text-brand-charcoal text-[11px] sm:text-xs">
+              ❓ Tab-by-Tab (One Season) vs All-at-Once?
+            </p>
+            <p className="text-brand-sage leading-relaxed text-[11px]">
+              <strong>We highly recommend importing tab-by-tab!</strong> Different spreadsheet tabs have customized structures (e.g. Handbag Inventory has quality ratings and pros/cons; Summer has cost and sizes). Select the matching season schema above and drag/paste that specific tab for perfect results.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <p className="font-semibold text-brand-charcoal text-[11px] sm:text-xs">
+              💡 Cleaned Statuses & Safe Descriptions (E & S / Buy / Existing)
+            </p>
+            <p className="text-brand-sage leading-relaxed text-[11px]">
+              Single-letter status is fully supported! We automatically map <strong>"E"</strong> or any labels with <em>"exist/own"</em> to <strong>In Closet</strong>. Column values of <strong>"S"</strong> / <strong>"Buy"</strong> or labels with <em>"shop/wish"</em> are mapped to <strong>Buy Wishlist</strong>. Accidental status letters found in descriptions are sanitized automatically!
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Core Drag-Drop Column & Cell Loader */}
         <div className="space-y-4">

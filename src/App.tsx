@@ -22,7 +22,11 @@ import {
   RefreshCw,
   Edit2,
   Trash2,
-  ListRestart
+  ListRestart,
+  Upload,
+  Link,
+  Globe,
+  Image as ImageIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -244,6 +248,60 @@ export default function App() {
     return "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=400&h=450&q=80";
   };
 
+  const [scrapeUrlInput, setScrapeUrlInput] = useState("");
+  const [isScraping, setIsScraping] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const handleScrapeImage = async (url: string, targetType: "new" | "edit") => {
+    if (!url.trim()) return;
+    setIsScraping(true);
+    setImageError(null);
+    try {
+      const res = await fetch("/api/scrape-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.imageUrl) {
+        if (targetType === "new") {
+          setNewItem(prev => ({ ...prev, imageUrl: data.imageUrl }));
+        } else if (targetType === "edit" && selectedItem) {
+          setSelectedItem({ ...selectedItem, imageUrl: data.imageUrl });
+        }
+        setScrapeUrlInput("");
+      } else {
+        setImageError(data.error || "Could not scrape custom photo from this link. Try pasting a direct image link.");
+      }
+    } catch (err: any) {
+      console.error("Scraper layout fail:", err);
+      setImageError("Communication with scraping server failed. Try directly entering an image link.");
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
+  const handleLocalImageUpload = (e: React.ChangeEvent<HTMLInputElement>, targetType: "new" | "edit") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert("This image exceeds 2.5MB. Please choose a smaller photo file to preserve local storage.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Url = reader.result as string;
+      if (targetType === "new") {
+        setNewItem(prev => ({ ...prev, imageUrl: base64Url }));
+      } else if (targetType === "edit" && selectedItem) {
+        setSelectedItem({ ...selectedItem, imageUrl: base64Url });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Add individual clothes item manually with validation, feedback & search lookup
   const handleAddIndividualItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,29 +341,33 @@ export default function App() {
       aiStylingAdvice: "Tap 'Enrich item Advice' to generate styling reviews!"
     };
 
-    try {
-      // Discover a representative styling image during saving
-      const imageRes = await fetch("/api/image-search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item: added.item,
-          color: added.color,
-          brand: added.brand
-        })
-      });
-      if (imageRes.ok) {
-        const imgData = await imageRes.json();
-        if (imgData.imageUrl) {
-          added.imageUrl = imgData.imageUrl;
+    if (newItem.imageUrl) {
+      added.imageUrl = newItem.imageUrl;
+    } else {
+      try {
+        // Discover a representative styling image during saving
+        const imageRes = await fetch("/api/image-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item: added.item,
+            color: added.color,
+            brand: added.brand
+          })
+        });
+        if (imageRes.ok) {
+          const imgData = await imageRes.json();
+          if (imgData.imageUrl) {
+            added.imageUrl = imgData.imageUrl;
+          }
         }
+      } catch (err) {
+        console.error("Error auto-fetching added garment visual:", err);
       }
-    } catch (err) {
-      console.error("Error auto-fetching added garment visual:", err);
     }
 
     setWardrobe(prev => [added, ...prev]);
-    setFormSuccess(`Direct addition of '${added.brand} ${added.item}' successful! Found representative visual look.`);
+    setFormSuccess(`Direct addition of '${added.brand} ${added.item}' successful!`);
     
     // Smooth timing reset & close
     setTimeout(() => {
@@ -318,7 +380,8 @@ export default function App() {
         notes: "",
         status: "existing",
         season: "Summer 25-26",
-        aiSuggestedCategory: "Tops"
+        aiSuggestedCategory: "Tops",
+        imageUrl: ""
       });
       setFormSuccess(null);
     }, 2200);
@@ -1086,6 +1149,99 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* Photo / Image URL manager section */}
+                    <div className="space-y-1.5 p-3.5 bg-stone-50 rounded-xl border border-stone-200">
+                      <span className="text-[9px] uppercase font-bold text-stone-500 tracking-wider flex items-center gap-1">
+                        <ImageIcon className="w-3.5 h-3.5 text-stone-500" /> Garment Photo / Visual
+                      </span>
+
+                      {selectedItem.imageUrl ? (
+                        <div className="flex items-center gap-3 bg-white p-2 border border-stone-150 rounded-lg">
+                          <img
+                            src={selectedItem.imageUrl}
+                            alt="Preview"
+                            className="w-12 h-12 object-cover rounded-md border border-stone-100"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[9px] font-mono text-stone-400 truncate">{selectedItem.imageUrl}</p>
+                            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">Custom Image Loaded</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedItem({ ...selectedItem, imageUrl: "" })}
+                            className="p-1 px-1.5 border border-red-250 hover:bg-red-50 text-red-500 text-[9px] uppercase tracking-wider font-bold rounded-md cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-stone-400 italic">
+                          No custom photo provided. (Uses automatic web styling representative image)
+                        </div>
+                      )}
+
+                      <div className="space-y-2 mt-2 pt-1 border-t border-stone-150">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {/* File Upload Selector */}
+                          <label className="cursor-pointer flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-stone-50 border border-stone-250 text-stone-700 text-[10px] tracking-wider font-bold uppercase rounded-lg transition-all shadow-3xs">
+                            <Upload className="w-3.5 h-3.5" />
+                            Upload Device Photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleLocalImageUpload(e, "edit")}
+                            />
+                          </label>
+                          <span className="text-[10px] text-stone-400">or</span>
+                        </div>
+
+                        {/* Link / URL input with scrape capabilities */}
+                        <div className="flex gap-1.5">
+                          <div className="relative flex-1">
+                            <Link className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-stone-400" />
+                            <input
+                              type="text"
+                              placeholder="Paste Direct Image URL or Store Webpage Link..."
+                              value={scrapeUrlInput}
+                              onChange={(e) => {
+                                setScrapeUrlInput(e.target.value);
+                                const val = e.target.value.trim();
+                                if (val.match(/\.(jpeg|jpg|gif|png|webp|svg)/i) || val.startsWith("data:")) {
+                                  setSelectedItem(prev => prev ? ({ ...prev, imageUrl: val }) : prev);
+                                  setScrapeUrlInput("");
+                                }
+                              }}
+                              className="w-full bg-white border border-stone-200 text-stone-800 text-xs pl-8 pr-3 py-1.5 rounded-lg focus:outline-none"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isScraping || !scrapeUrlInput.trim()}
+                            onClick={() => handleScrapeImage(scrapeUrlInput, "edit")}
+                            className="px-3 bg-stone-900 text-stone-50 hover:bg-stone-800 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50 flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                          >
+                            {isScraping ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                Scraping...
+                              </>
+                            ) : (
+                              <>
+                                <Globe className="w-3.5 h-3.5" />
+                                Grab Image
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {imageError && (
+                        <p className="text-[10px] text-red-500 font-medium">{imageError}</p>
+                      )}
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">Textile Description</label>
                       <input
@@ -1334,6 +1490,99 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Photo / Image URL manager section */}
+                <div className="space-y-1.5 p-3.5 bg-stone-50 rounded-xl border border-stone-200">
+                  <span className="text-[9px] uppercase font-bold text-stone-500 tracking-wider flex items-center gap-1">
+                    <ImageIcon className="w-3.5 h-3.5 text-stone-500" /> Garment Photo / Visual
+                  </span>
+
+                  {newItem.imageUrl ? (
+                    <div className="flex items-center gap-3 bg-white p-2 border border-stone-150 rounded-lg">
+                      <img
+                        src={newItem.imageUrl}
+                        alt="Preview"
+                        className="w-12 h-12 object-cover rounded-md border border-stone-100"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] font-mono text-stone-400 truncate">{newItem.imageUrl}</p>
+                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">Custom Image Loaded</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, imageUrl: "" })}
+                        className="p-1 px-1.5 border border-red-250 hover:bg-red-50 text-red-500 text-[9px] uppercase tracking-wider font-bold rounded-md cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-stone-400 italic">
+                      No custom photo provided. (Will find web styling representative image if left empty)
+                    </div>
+                  )}
+
+                  <div className="space-y-2 mt-2 pt-1 border-t border-stone-150">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* File Upload Selector */}
+                      <label className="cursor-pointer flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-stone-50 border border-stone-250 text-stone-700 text-[10px] tracking-wider font-bold uppercase rounded-lg transition-all shadow-3xs">
+                        <Upload className="w-3.5 h-3.5" />
+                        Upload Device Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleLocalImageUpload(e, "new")}
+                        />
+                      </label>
+                      <span className="text-[10px] text-stone-400">or</span>
+                    </div>
+
+                    {/* Link / URL input with scrape capabilities */}
+                    <div className="flex gap-1.5">
+                      <div className="relative flex-1">
+                        <Link className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-stone-400" />
+                        <input
+                          type="text"
+                          placeholder="Paste Direct Image URL or Store Webpage Link..."
+                          value={scrapeUrlInput}
+                          onChange={(e) => {
+                            setScrapeUrlInput(e.target.value);
+                            const val = e.target.value.trim();
+                            if (val.match(/\.(jpeg|jpg|gif|png|webp|svg)/i) || val.startsWith("data:")) {
+                              setNewItem(prev => ({ ...prev, imageUrl: val }));
+                              setScrapeUrlInput("");
+                            }
+                          }}
+                          className="w-full bg-white border border-stone-200 text-stone-800 text-xs pl-8 pr-3 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isScraping || !scrapeUrlInput.trim()}
+                        onClick={() => handleScrapeImage(scrapeUrlInput, "new")}
+                        className="px-3 bg-stone-900 text-stone-50 hover:bg-stone-800 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50 flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                      >
+                        {isScraping ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            Scraping...
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="w-3.5 h-3.5" />
+                            Grab Image
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {imageError && (
+                    <p className="text-[10px] text-red-500 font-medium">{imageError}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">

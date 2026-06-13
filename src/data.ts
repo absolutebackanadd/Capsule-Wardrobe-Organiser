@@ -265,6 +265,133 @@ export const initialCuratedWardrobe: WardrobeItem[] = [
   }
 ];
 
+
+// Classic human-aligned heuristic guesser for wardrobe categories
+export function guessCategory(item: string, season?: string): string {
+  if (season === "Handbag Inventory") return "Accessories";
+  
+  const raw = (item || "").toLowerCase().trim();
+  
+  // Outerwear keywords
+  if (
+    raw.includes("coat") || 
+    raw.includes("jacket") ||  
+    raw.includes("trench") || 
+    raw.includes("blazer") || 
+    raw.includes("shacket") || 
+    raw.includes("puffer") || 
+    raw.includes("vest") || 
+    raw.includes("cardigan") ||
+    raw.includes("parka") ||
+    raw.includes("outerwear") ||
+    raw.includes("duster")
+  ) {
+    return "Outerwear";
+  }
+  
+  // Shoes keywords
+  if (
+    raw.includes("boot") || 
+    raw.includes("shoe") || 
+    raw.includes("sneaker") || 
+    raw.includes("heel") || 
+    raw.includes("sandal") || 
+    raw.includes("flat") || 
+    raw.includes("loafer") || 
+    raw.includes("slide") || 
+    raw.includes("mule") || 
+    raw.includes("trainer") || 
+    raw.includes("footwear") ||
+    raw.includes("blundstone") ||
+    raw.includes("martens")
+  ) {
+    return "Shoes";
+  }
+  
+  // Bottoms keywords
+  if (
+    raw.includes("trouser") || 
+    raw.includes("pant") || 
+    raw.includes("jean") || 
+    raw.includes("skirt") || 
+    raw.includes("short") || 
+    raw.includes("legging") || 
+    raw.includes("denim") || 
+    raw.includes("slack") || 
+    raw.includes("culotte") ||
+    raw.includes("bottom")
+  ) {
+    return "Bottoms";
+  }
+  
+  // Dresses keywords
+  if (
+    raw.includes("dress") || 
+    raw.includes("jumpsuit") || 
+    raw.includes("unitard") || 
+    raw.includes("romper") || 
+    raw.includes("slip") || 
+    raw.includes("gown") || 
+    raw.includes("overall") || 
+    raw.includes("dungaree")
+  ) {
+    return "Dresses";
+  }
+  
+  // Accessories keywords
+  if (
+    raw.includes("bag") || 
+    raw.includes("handbag") || 
+    raw.includes("purse") || 
+    raw.includes("belt") || 
+    raw.includes("scarf") || 
+    raw.includes("hat") || 
+    raw.includes("cap") || 
+    raw.includes("jewelry") || 
+    raw.includes("necklace") || 
+    raw.includes("ring") || 
+    raw.includes("earring") || 
+    raw.includes("backpack") || 
+    raw.includes("tote") || 
+    raw.includes("clutch") || 
+    raw.includes("wallet") || 
+    raw.includes("sunglass") || 
+    raw.includes("accessory") ||
+    raw.includes("eyewear") ||
+    raw.includes("socks") ||
+    raw.includes("tights")
+  ) {
+    return "Accessories";
+  }
+  
+  // Tops keywords (lots of names for tops)
+  if (
+    raw.includes("shirt") || 
+    raw.includes("tee") || 
+    raw.includes("t-shirt") || 
+    raw.includes("top") || 
+    raw.includes("blouse") || 
+    raw.includes("sweater") || 
+    raw.includes("knit") || 
+    raw.includes("tank") || 
+    raw.includes("cami") || 
+    raw.includes("crochet") || 
+    raw.includes("turtleneck") || 
+    raw.includes("polo") || 
+    raw.includes("long sleeve") || 
+    raw.includes("crewneck") || 
+    raw.includes("pullover") || 
+    raw.includes("sweatshirt") || 
+    raw.includes("hoodie") || 
+    raw.includes("bodysuit")
+  ) {
+    return "Tops";
+  }
+  
+  // Default fallback
+  return "Tops";
+}
+
 // Helper to compile statistics for wardrobe analysis
 export function compileWardrobeStats(items: WardrobeItem[]): WardrobeStats {
   const totalCount = items.length;
@@ -277,7 +404,7 @@ export function compileWardrobeStats(items: WardrobeItem[]): WardrobeStats {
 
   items.forEach(item => {
     // 1. Category tally
-    const cat = item.aiSuggestedCategory || "Tops";
+    const cat = item.aiSuggestedCategory || guessCategory(item.item, item.season);
     itemsByCategory[cat] = (itemsByCategory[cat] || 0) + 1;
 
     // 2. Color tally
@@ -331,7 +458,6 @@ export function parseSpreadsheetText(text: string, forceSeason?: string): Omit<W
   }
 
   // Find a header line that has actual content keys
-  // For handbags, there might not be a header line. Let's inspect the first non-intro line
   let headerIndex = 0;
   for (let i = 0; i < Math.min(10, lines.length); i++) {
     const lLower = lines[i].toLowerCase();
@@ -356,12 +482,83 @@ export function parseSpreadsheetText(text: string, forceSeason?: string): Omit<W
 
   const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
 
+  // Dynamic header scanner
+  const findColumnIndex = (targetTerms: string[], excludeTerms?: string[]): number => {
+    return headers.findIndex((h) => {
+      const hLower = h.toLowerCase().trim();
+      const matchesTarget = targetTerms.some(term => hLower.includes(term));
+      if (!matchesTarget) return false;
+      if (excludeTerms && excludeTerms.some(term => hLower.includes(term))) return false;
+      return true;
+    });
+  };
+
+  // Find column indices dynamically
+  let targetItemIdx = findColumnIndex(["item type", "item", "product", "type"]);
+  let targetColorIdx = findColumnIndex(["colour", "color", "pattern", "shade"]);
+  let targetStatusIdx = findColumnIndex(["source", "existing or buy", "status", "own", "possembled", "e/s", "e or s", "shop", "existing/shop", "existing or shop", "existing/"]);
+  let targetBrandIdx = findColumnIndex(["brand", "label", "designer", "source brand"]);
+  let targetNotesIdx = findColumnIndex(["notes", "comment"]);
+  let targetDescIdx = findColumnIndex(["link", "description", "desc", "material", "url"]);
+  let targetSizeIdx = findColumnIndex(["size"]);
+  let targetCostIdx = findColumnIndex(["cost", "price"]);
+  let targetRatingIdx = findColumnIndex(["rating"]);
+  let targetProsIdx = findColumnIndex(["pros"]);
+  let targetConsIdx = findColumnIndex(["cons"]);
+
+  // Double check if first column is the standard index numbers ("No", "n°", etc.) so we can apply precise offsets for fallbacks
+  const firstColClean = headers[0]?.toLowerCase().trim() || "";
+  const hasNoCol = firstColClean === "no" || firstColClean === "n°" || firstColClean === "" || (/^\d+$/).test(firstColClean);
+  const offset = hasNoCol ? 0 : -1;
+
+  // Layout Hardcoded Fallbacks designed for NELSON spreadsheet imports when column titles are slightly misaligned
+  if (detectedSeason === "Summer 25-26") {
+    if (targetItemIdx === -1) targetItemIdx = Math.max(0, 1 + offset);
+    if (targetColorIdx === -1) targetColorIdx = Math.max(0, 2 + offset);
+    if (targetStatusIdx === -1) targetStatusIdx = Math.max(0, 3 + offset);
+    if (targetCostIdx === -1) targetCostIdx = Math.max(0, 4 + offset);
+    if (targetDescIdx === -1) targetDescIdx = Math.max(0, 5 + offset);
+    if (targetSizeIdx === -1) targetSizeIdx = Math.max(0, 6 + offset);
+    if (targetNotesIdx === -1) targetNotesIdx = Math.max(0, 7 + offset);
+  } 
+  else if (detectedSeason === "Winter 26") {
+    if (targetItemIdx === -1) targetItemIdx = Math.max(0, 1 + offset);
+    if (targetColorIdx === -1) targetColorIdx = Math.max(0, 2 + offset);
+    if (targetBrandIdx === -1) targetBrandIdx = Math.max(0, 3 + offset);
+    if (targetNotesIdx === -1) targetNotesIdx = Math.max(0, 4 + offset);
+    if (targetDescIdx === -1) targetDescIdx = Math.max(0, 5 + offset);
+    if (targetSizeIdx === -1) targetSizeIdx = Math.max(0, 6 + offset);
+  }
+  else if (detectedSeason === "Autumn 26") {
+    if (targetItemIdx === -1) targetItemIdx = Math.max(0, 1 + offset);
+    if (targetColorIdx === -1) targetColorIdx = Math.max(0, 2 + offset);
+    if (targetBrandIdx === -1) targetBrandIdx = Math.max(0, 3 + offset);
+    if (targetNotesIdx === -1) targetNotesIdx = Math.max(0, 4 + offset);
+  }
+  else if (detectedSeason === "Handbag Inventory") {
+    const handbagOffset = (headers[0]?.toLowerCase().trim() === "brand") ? 0 : (hasNoCol ? 0 : -1);
+    if (targetBrandIdx === -1) targetBrandIdx = Math.max(0, 0 + handbagOffset);
+    if (targetColorIdx === -1) targetColorIdx = Math.max(0, 1 + handbagOffset);
+    if (targetItemIdx === -1) targetItemIdx = Math.max(0, 2 + handbagOffset);
+    if (targetDescIdx === -1) targetDescIdx = Math.max(0, 3 + handbagOffset);
+    if (targetSizeIdx === -1) targetSizeIdx = Math.max(0, 4 + handbagOffset);
+    if (targetProsIdx === -1) targetProsIdx = Math.max(0, 5 + handbagOffset);
+    if (targetConsIdx === -1) targetConsIdx = Math.max(0, 6 + handbagOffset);
+    if (targetRatingIdx === -1) targetRatingIdx = Math.max(0, 7 + handbagOffset);
+  }
+  else if (detectedSeason === "Dream AW") {
+    const dreamOffset = (headers[0]?.toLowerCase().trim() === "item") ? 0 : (hasNoCol ? 0 : -1);
+    if (targetItemIdx === -1) targetItemIdx = Math.max(0, 0 + dreamOffset);
+    if (targetColorIdx === -1) targetColorIdx = Math.max(0, 1 + dreamOffset);
+    if (targetBrandIdx === -1) targetBrandIdx = Math.max(0, 2 + dreamOffset);
+    if (targetNotesIdx === -1) targetNotesIdx = Math.max(0, 3 + dreamOffset);
+    if (targetStatusIdx === -1) targetStatusIdx = Math.max(0, 4 + dreamOffset);
+  }
+
   const parsedItems: Omit<WardrobeItem, "id" | "hex">[] = [];
 
-  // Parse lines starting after headerIndex
   for (let i = headerIndex + 1; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Skip empty lines or total rows
     if (!line || line.toLowerCase().startsWith("total") || line.startsWith(",,,") || line.startsWith("total,")) continue;
 
     let parts: string[] = [];
@@ -371,186 +568,114 @@ export function parseSpreadsheetText(text: string, forceSeason?: string): Omit<W
       parts = line.split(delimiter).map(p => p.trim());
     }
 
-    // Ignore line if it is just commas (from excel exporting wider blank cells)
     if (parts.every(p => !p || p === "")) continue;
 
-    // Handle distinct model schemas
-    if (detectedSeason === "Handbag Inventory") {
-      // Schema: Brand, Color, Type, Material, Size, Pros, Cons, Rating
-      // Or in the file: row starts with Brand like "The Leather Satchel Company, Black, Satchel..."
-      // Let's safe read indexes:
-      // index 0: Brand
-      // index 1: Color
-      // index 2: Type (Item)
-      // index 3: Material
-      // index 4: Size
-      // index 5: Pros
-      // index 6: Cons
-      // index 7: Rating
-      const brandVal = parts[0]?.trim() || "Classic";
-      const colorVal = parts[1]?.trim() || "Black";
-      const typeVal = parts[2]?.trim() || "Handbag";
-      const materialVal = parts[3]?.trim() || "";
-      const sizeVal = parts[4]?.trim() || "";
-      const prosVal = parts[5]?.trim() || "";
-      const consVal = parts[6]?.trim() || "";
-      const ratingVal = parts[7]?.trim() || "5";
+    const itemVal = targetItemIdx !== -1 && parts[targetItemIdx] ? parts[targetItemIdx].trim() : "";
+    if (!itemVal || itemVal.toLowerCase() === "item" || itemVal.toLowerCase() === "no") continue;
 
-      if (brandVal && typeVal) {
-        let cleanNotes = `Rating: ${ratingVal}/5. Size: ${sizeVal}. Material: ${materialVal}`;
-        if (prosVal) cleanNotes += `. Pros: ${prosVal}`;
-        if (consVal) cleanNotes += `. Cons: ${consVal}`;
+    const colorVal = targetColorIdx !== -1 && parts[targetColorIdx] ? parts[targetColorIdx].trim() : "";
+    const statusVal = targetStatusIdx !== -1 && parts[targetStatusIdx] ? parts[targetStatusIdx].trim() : "";
+    const brandVal = targetBrandIdx !== -1 && parts[targetBrandIdx] ? parts[targetBrandIdx].trim() : "";
+    const notesVal = targetNotesIdx !== -1 && parts[targetNotesIdx] ? parts[targetNotesIdx].trim() : "";
+    const descValRaw = targetDescIdx !== -1 && parts[targetDescIdx] ? parts[targetDescIdx].trim() : "";
+    const sizeVal = targetSizeIdx !== -1 && parts[targetSizeIdx] ? parts[targetSizeIdx].trim() : "";
+    const costVal = targetCostIdx !== -1 && parts[targetCostIdx] ? parts[targetCostIdx].trim() : "";
+    const ratingVal = targetRatingIdx !== -1 && parts[targetRatingIdx] ? parts[targetRatingIdx].trim() : "";
+    const prosVal = targetProsIdx !== -1 && parts[targetProsIdx] ? parts[targetProsIdx].trim() : "";
+    const consVal = targetConsIdx !== -1 && parts[targetConsIdx] ? parts[targetConsIdx].trim() : "";
 
-        parsedItems.push({
-          item: typeVal,
-          color: colorVal,
-          description: materialVal || `${sizeVal} Handbag`,
-          brand: brandVal,
-          notes: cleanNotes,
-          status: "existing",
-          season: "Handbag Inventory"
-        });
-      }
-    } 
-    else if (detectedSeason === "Summer 25-26") {
-      // Schema: No, Item type, Colour / pattern, Source, Cost, Link, Size, Notes
-      // Row 1: `1,Basic T-Shirt (V-Neck),White,E,,,,,,`
-      // index 1: Item type (item)
-      // index 2: Colour / pattern (color)
-      // index 3: Source (could be E or S indicating status, or a brand)
-      // index 4: Cost
-      // index 5: Link/details
-      // index 6: Size
-      // index 7: Notes
-      const itemVal = parts[1]?.trim();
-      const colorVal = parts[2]?.trim();
-      const sourceVal = parts[3]?.trim() || ""; // Might hold 'E' or 'S'
-      const costVal = parts[4]?.trim() || "";
-      const linkVal = parts[5]?.trim() || "";
-      const sizeVal = parts[6]?.trim() || "";
-      const notesVal = parts[7]?.trim() || "";
-
-      if (itemVal) {
-        // Parse E vs S status
-        let status: "existing" | "buy" = "existing";
-        if (sourceVal.toUpperCase() === "S" || sourceVal.toLowerCase().includes("buy") || notesVal.toLowerCase().includes("buy") || notesVal.toLowerCase().includes("wish list")) {
-          status = "buy";
-        }
-
-        // Guess brand from link detail e.g. "MAX" or "AS Colour"
-        let guessedBrand = "Classic";
-        const combinedText = `${linkVal} ${notesVal}`.toLowerCase();
-        if (combinedText.includes("max")) guessedBrand = "MAX";
-        if (combinedText.includes("as colour")) guessedBrand = "AS Colour";
-        if (combinedText.includes("decjuba")) guessedBrand = "Decjuba";
-
-        let cleanNotes = notesVal;
-        if (sizeVal) cleanNotes += ` (Size: ${sizeVal})`;
-        if (costVal) cleanNotes += ` [Cost: ${costVal}]`;
-        if (linkVal) cleanNotes += ` - ${linkVal}`;
-
-        parsedItems.push({
-          item: itemVal,
-          color: colorVal || "Neutral",
-          description: linkVal || `Summer essentials piece`,
-          brand: guessedBrand,
-          notes: cleanNotes,
-          status: status,
-          season: "Summer 25-26"
-        });
+    // Assemble Description (sanitizing accidental E/S status tokens)
+    let finalDescription = descValRaw;
+    if (!finalDescription) {
+      if (detectedSeason === "Handbag Inventory") {
+        finalDescription = `${sizeVal || 'Medium'} Handbag`;
+      } else if (detectedSeason === "Summer 25-26") {
+        finalDescription = "Summer essentials piece";
+      } else if (detectedSeason === "Winter 26") {
+        finalDescription = "Winter layers base";
+      } else if (detectedSeason === "Autumn 26") {
+        finalDescription = "Autumn transitional items";
+      } else {
+        finalDescription = "Capsule planning garment";
       }
     }
-    else if (detectedSeason === "Winter 26") {
-      // Schema: No, Item type, Colour / pattern, Brand, Notes, Link, Size
-      const itemVal = parts[1]?.trim();
-      const colorVal = parts[2]?.trim();
-      const brandVal = parts[3]?.trim() || "Classic";
-      const notesVal = parts[4]?.trim() || "";
-      const linkVal = parts[5]?.trim() || "";
-      const sizeVal = parts[6]?.trim() || "";
 
-      if (itemVal) {
-        let status: "existing" | "buy" = "existing";
-        const lNotes = (notesVal + " " + linkVal).toLowerCase();
-        if (lNotes.includes("wish list") || lNotes.includes("buy") || lNotes.includes("shopping") || lNotes.includes("plan")) {
-          status = "buy";
-        }
-
-        let cleanNotes = notesVal;
-        if (sizeVal) cleanNotes += ` (Size: ${sizeVal})`;
-        if (linkVal) cleanNotes += ` - Look: ${linkVal}`;
-
-        parsedItems.push({
-          item: itemVal,
-          color: colorVal || "Neutral",
-          description: `Winter layers base`,
-          brand: brandVal,
-          notes: cleanNotes,
-          status: status,
-          season: "Winter 26"
-        });
+    const dClean = finalDescription.trim().toLowerCase();
+    if (
+      dClean === "e" || 
+      dClean === "s" || 
+      dClean === "buy" || 
+      dClean === "existing" ||
+      dClean === "own" ||
+      dClean === "shop" ||
+      dClean === "status"
+    ) {
+      if (detectedSeason === "Handbag Inventory") {
+        finalDescription = "Leather accessories";
+      } else if (detectedSeason === "Summer 25-26") {
+        finalDescription = "Summer essentials piece";
+      } else if (detectedSeason === "Winter 26") {
+        finalDescription = "Winter layers base";
+      } else if (detectedSeason === "Autumn 26") {
+        finalDescription = "Autumn transitional items";
+      } else {
+        finalDescription = "Capsule planning garment";
       }
     }
-    else if (detectedSeason === "Autumn 26") {
-      // Schema: No, Item type, Colour / pattern, Brand , Notes
-      const itemVal = parts[1]?.trim();
-      const colorVal = parts[2]?.trim();
-      const brandVal = parts[3]?.trim() || "Classic";
-      const notesVal = parts[4]?.trim() || "";
 
-      if (itemVal) {
-        let status: "existing" | "buy" = "existing";
-        if (notesVal.toLowerCase().includes("wish") || notesVal.toLowerCase().includes("buy") || notesVal.toLowerCase().includes("new")) {
-          // If notes have "new" it could check price, mostly existing unless wishlist
-          if (notesVal.toLowerCase().includes("wish")) {
-            status = "buy";
-          }
-        }
-
-        parsedItems.push({
-          item: itemVal,
-          color: colorVal || "Neutral",
-          description: `Autumn transitional items`,
-          brand: brandVal,
-          notes: notesVal,
-          status: status,
-          season: "Autumn 26"
-        });
-      }
-    }
-    else {
-      // Default / Dream AW / Universal fallback column search
-      const itemIdx = headers.findIndex(h => h.includes("item") || h.includes("product") || h.includes("type"));
-      const colorIdx = headers.findIndex(h => h.includes("color") || h.includes("colour") || h.includes("pattern") || h.includes("desc"));
-      const brandIdx = headers.findIndex(h => h.includes("brand") || h.includes("label") || h.includes("source"));
-      const notesIdx = headers.findIndex(h => h.includes("note") || h.includes("comment") || h.includes("desc"));
-      const statusIdx = headers.findIndex(h => h.includes("existing") || h.includes("buy") || h.includes("status") || h.includes("own"));
-
-      const itemVal = itemIdx !== -1 && parts[itemIdx] ? parts[itemIdx].trim() : parts[0] || "";
-      const colorVal = colorIdx !== -1 && parts[colorIdx] ? parts[colorIdx].trim() : parts[1] || "";
-      const brandVal = brandIdx !== -1 && parts[brandIdx] ? parts[brandIdx].trim() : parts[2] || "";
-      const notesVal = notesIdx !== -1 && parts[notesIdx] ? parts[notesIdx].trim() : parts[3] || "";
-      const statusValRaw = statusIdx !== -1 && parts[statusIdx] ? parts[statusIdx].toLowerCase().trim() : "";
-
-      let status: "existing" | "buy" = (detectedSeason === "Dream AW") ? "buy" : "existing"; // Dream AW defaults to buy
-      if (statusValRaw.toUpperCase() === "E" || statusValRaw.includes("exist") || statusValRaw.includes("own") || notesVal.toLowerCase().includes("existing")) {
-        status = "existing";
-      } else if (statusValRaw.includes("buy") || statusValRaw.includes("wish")) {
+    // Determine status (Existing vs Buy) cleanly
+    let status: "existing" | "buy" = "existing";
+    const statusClean = statusVal.toLowerCase().trim();
+    if (statusClean === "s" || statusClean === "buy" || statusClean.includes("wish") || statusClean.includes("shop") || statusClean.includes("target")) {
+      status = "buy";
+    } else if (statusClean === "e" || statusClean.includes("exist") || statusClean.includes("own") || statusClean.includes("assemble")) {
+      status = "existing";
+    } else {
+      // Default guess fallback based on season
+      if (detectedSeason === "Dream AW") {
         status = "buy";
-      }
-
-      if (itemVal && itemVal.toLowerCase() !== "item" && itemVal.toLowerCase() !== "no") {
-        parsedItems.push({
-          item: itemVal,
-          color: colorVal || "Neutral",
-          description: `Capsule planning garment`,
-          brand: brandVal || "Classic",
-          notes: notesVal,
-          status: status,
-          season: detectedSeason
-        });
+      } else {
+        status = "existing";
       }
     }
+
+    // Determine brand cleanly (sanitizing accidental E/S status tokens)
+    let finalBrand = brandVal;
+    const bClean = finalBrand.toLowerCase().trim();
+    if (!finalBrand || bClean === "e" || bClean === "s" || bClean === "buy" || bClean === "existing") {
+      const combined = `${notesVal} ${descValRaw} ${itemVal}`.toLowerCase();
+      if (combined.includes("max")) finalBrand = "MAX";
+      else if (combined.includes("as colour")) finalBrand = "AS Colour";
+      else if (combined.includes("decjuba")) finalBrand = "Decjuba";
+      else if (combined.includes("dr martens") || combined.includes("doc martin")) finalBrand = "Dr Martens";
+      else if (combined.includes("blundstone")) finalBrand = "Blundstone";
+      else if (combined.includes("rm williams")) finalBrand = "RM Williams";
+      else if (combined.includes("kilt")) finalBrand = "Kilt";
+      else finalBrand = "Classic";
+    }
+
+    // Determine Notes
+    let finalNotes = notesVal || "";
+    if (detectedSeason === "Handbag Inventory") {
+      let extra = `Rating: ${ratingVal || '5'}/5. Size: ${sizeVal || 'M'}`;
+      if (prosVal) extra += `. Pros: ${prosVal}`;
+      if (consVal) extra += `. Cons: ${consVal}`;
+      finalNotes = finalNotes ? `${finalNotes} (${extra})` : extra;
+    } else {
+      if (sizeVal) finalNotes += ` (Size: ${sizeVal})`;
+      if (costVal) finalNotes += ` [Cost: ${costVal}]`;
+    }
+
+    parsedItems.push({
+      item: itemVal,
+      color: colorVal || "Neutral",
+      description: finalDescription,
+      brand: finalBrand,
+      notes: finalNotes,
+      status: status,
+      season: detectedSeason,
+      aiSuggestedCategory: guessCategory(itemVal, detectedSeason)
+    });
   }
 
   return parsedItems;
